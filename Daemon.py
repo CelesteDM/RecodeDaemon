@@ -8,17 +8,17 @@ from SharedState import SharedState
 
 class Daemon:
     queues: list[Queue] = []
-    failed_queues: list[Queue] = []
-    state = ""
+    status = ""
 
     def __init__(self, shared: SharedState) -> None:
         self.shared = shared
         self.state_dir = shared.state_dir
         self.queues_path = os.path.join(self.state_dir, "queues")
+        self.history_path = os.path.join(self.state_dir, "history")
 
         self.init_state_dir()
         self.load_queues()
-        self.set_state("WAITING")
+        self.set_status("WAITING")
 
     def init_state_dir(self) -> None:
         if not os.access(self.state_dir, os.F_OK):
@@ -32,15 +32,21 @@ class Daemon:
             sys.stderr.write(f"Could not open state directory. PermissionError\n{self.state_dir}: Permission Denied.\n")
             exit(1)
 
-    def set_state(self, state: str) -> None:
-        self.state = state
-        self.shared.update(state=state)
+    def dump_history(self, queue) -> None:
+        with open(self.history_path, 'wb') as history_file:
+            pickle.dump(queue.snapshot(), history_file)
 
-    def dump_queues(self) -> None:
+    def set_status(self, status: str) -> None:
+        self.status = status
+        self.shared.update(status=status)
+
+    def dump_queues(self, reason) -> None:
+        print(f"Dump requested, reason: {reason}")
         snapshot = {}
         with open(self.queues_path, 'wb') as queue_file:
             for index, item in enumerate(self.queues):
                 snapshot[index] = item.snapshot()
+                print(f"Dumping: {item.snapshot()}")
                 pickle.dump(item, queue_file)
         self.shared.update(queues=snapshot)
 
@@ -73,7 +79,7 @@ class Daemon:
             self.queues.append(Queue(params[0], params[1], params[2]))
 
         os.remove(queue_file)
-        self.dump_queues()
+        self.dump_queues("New queue added from .queue file")
 
     def check_next(self) -> None:
         for obj in os.scandir(self.state_dir):
@@ -81,40 +87,40 @@ class Daemon:
                 self.parse_queue(obj.path)
 
     def run_queues(self) -> None:
-        for _ in range(len(self.queues)):
-            active_queue = self.queues[0]
-            while active_queue.items_remaining != 0:
+        queue_list = self.queues
+        for active_queue in queue_list:
+            self.shared.update(active_queue=active_queue.snapshot())
+            while active_queue.status not in ["SUCCESS", "FAILED"]:
                 self.active_worker = threading.Thread(target=active_queue.run_next, daemon=True)
                 self.active_worker.start()
 
                 while self.active_worker.is_alive():
                     self.shared.update(active_queue=active_queue.snapshot())
+                    self.dump_queues("Update during recoding")
+                    sleep(1)
+
                 self.active_worker = None
                 self.shared.update(active_queue={})
-                self.dump_queues()
+                self.dump_queues("Update after recoding")
 
-            active_queue.set_exit_status()
-            if active_queue.state != "SUCCESS":
-                self.failed_queues.append(active_queue)
+            self.dump_history(active_queue)
             self.queues.remove(active_queue)
-            self.dump_queues()
-
+            self.dump_queues("Update after finishing all queues")
 
     def run(self) -> None:
         while True:
-            match self.state:
+            match self.status:
                 case "WAITING":
                     self.check_next()
 
                     if self.queues:
-                        self.set_state("RECODING")
+                        self.set_status("RECODING")
                     else:
                         sleep(3)
 
                 case "RECODING":
-                    self.dump_queues()
-                    sleep(3)
-                    # self.run_queues()
+                    self.dump_queues("Update before recoding")
+                    self.run_queues()
 
                     if not self.queues:
-                        self.set_state("WAITING")
+                        self.set_status("WAITING")

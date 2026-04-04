@@ -3,14 +3,14 @@ import os
 
 class RecodeHandler():
 
-    def __init__(self, entry: os.DirEntry, tunning: str, preset: str):
+    def __init__(self, entry: dict, tunning: str, preset: str):
 
         self.entry = entry
-        self.audio = self.get_channels(self.entry.path, "audio")
-        self.subs = self.get_channels(self.entry.path, "subtitles")
+        self.audio = self.get_channels(entry["path"], "audio")
+        self.subs = self.get_channels(entry["path"], "subtitles")
         self.preset = preset
         self.tunning = tunning
-        self.output = os.path.join(os.path.dirname(self.entry.path), f"RECODE_{self.entry.name}")
+        self.output = os.path.join(os.path.dirname(entry["path"]), f"RECODE_{entry['name']}")
 
     def get_channels(self, file: str, channel: str) -> dict:
 
@@ -42,7 +42,7 @@ class RecodeHandler():
 
     def run(self):
 
-        cmd_root = ["ffmpeg", "-nostdin", "-y", "-i", self.entry.path, "-map", "0:v"]
+        cmd_root = ["ffmpeg", "-nostdin", "-y", "-i", self.entry["path"], "-map", "0:v"]
         cmd_audio_mapping, cmd_subtitles_mapping = ["-map", "0:a"], ["-map", "0:s"]
         cmd_video_settings = ["-c:v", "libx265", "-preset", self.preset, "-tune", self.tunning]
         cmd_audio_settings = ["-c:a", "aac", "-b:a", "192k", "-ac", "2"]

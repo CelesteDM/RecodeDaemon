@@ -9,11 +9,12 @@ class SocketHandler:
     def __init__(self, shared) -> None:
         self.shared = shared
         self.state_dir = shared.state_dir
+        self.socket_path = os.path.join(self.state_dir, "recode.sock")
 
-        if os.path.exists("./var/run/recode.sock"):
-            os.remove("./var/run/recode.sock")
+        if os.path.exists(self.socket_path):
+            os.remove(self.socket_path)
 
-        self.socket.bind("./var/run/recode.sock")
+        self.socket.bind(self.socket_path)
         self.socket.listen()
 
     def create_queue(self, request) -> str:
@@ -34,6 +35,9 @@ class SocketHandler:
 
                 case "new_queue":
                     response = self.create_queue(request)
+
+                case "history":
+                    response = shared.read_history()
 
                 case _:
                     response = {"error": "unknown command"}
