@@ -1,11 +1,14 @@
 import threading
 import os
+from subprocess import Popen
 from pickle import load
 
 class SharedState:
     def __init__(self, state_dir) -> None:
         self.state_dir = os.path.expandvars(state_dir)
         self._lock = threading.Lock()
+        self._workers = []
+        self._threads = []
         self._data = {
             "status": "",
             "active_queue": {},
@@ -15,6 +18,22 @@ class SharedState:
     def update(self, **kwargs) -> None:
         with self._lock:
             self._data.update(kwargs)
+
+    def append_thread(self, thread: threading.Thread) -> None:
+        with self._lock:
+            self._threads.append(thread)
+
+    def remove_thread(self, thread: threading.Thread) -> None:
+        with self._lock:
+            self._threads.remove(thread)
+
+    def append_worker(self, worker: Popen) -> None:
+        with self._lock:
+            self._workers.append(worker)
+
+    def remove_worker(self, worker: Popen) -> None:
+        with self._lock:
+            self._workers.remove(worker)
 
     def snapshot(self) -> dict:
         with self._lock:

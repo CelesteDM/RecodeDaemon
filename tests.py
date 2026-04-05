@@ -1,18 +1,11 @@
 from time import sleep
 import threading
-import signal
 from SharedState import SharedState
 from SocketHandler import SocketHandler
 from Daemon import Daemon
 
 DAEMON_STATE_DIR = "$XDG_STATE_HOME/recoder"
 THREADS = []
-
-# def exit_daemon(signum, frame):
-#     for thread in THREADS:
-#         thread.close()
-#     exit(0)
-# signal.signal(signal.SIGINT, exit_daemon)
 
 def test_setup():
     shared = SharedState(DAEMON_STATE_DIR)

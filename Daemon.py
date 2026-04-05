@@ -18,7 +18,7 @@ class Daemon:
 
         self.init_state_dir()
         self.load_queues()
-        self.set_status("WAITING")
+        self.set_status("IDLE")
 
     def init_state_dir(self) -> None:
         if not os.access(self.state_dir, os.F_OK):
@@ -47,7 +47,7 @@ class Daemon:
             for index, item in enumerate(self.queues):
                 snapshot[index] = item.snapshot()
                 print(f"Dumping: {item.snapshot()}")
-                pickle.dump(item, queue_file)
+                pickle.dump(snapshot[index], queue_file)
         self.shared.update(queues=snapshot)
 
     def load_queues(self) -> None:
@@ -57,12 +57,17 @@ class Daemon:
         len = os.path.getsize(self.queues_path)
         with open(self.queues_path, 'rb') as state_file:
             while state_file.tell() < len:
-                queues.append(pickle.load(state_file))
+                snapshot = pickle.load(state_file)
+                new_queue = Queue(self.shared)
+                print("Restoring queue with this snapshot:")
+                print(snapshot)
+                new_queue.restore(snapshot)
+                queues.append(new_queue)
         if queues:
             self.queues = queues
 
     def parse_queue(self, queue_file) -> None:
-        params = ["","",""]
+        params = ["","",bool]
         with open(queue_file, 'r') as data:
             for _ in range(len(params)):
                 line = data.readline()
@@ -71,12 +76,17 @@ class Daemon:
                     match tokens[0]:
                         case "path":
                             params[0] = tokens[1].rstrip()
-                        case "tune":
-                            params[1] = tokens[1].rstrip()
                         case "preset":
-                            params[2] = tokens[1].rstrip()
+                            params[1] = tokens[1].rstrip()
+                        case "is_animation":
+                            if tokens[1].rstrip() == "True":
+                                params[2] = bool(1)
+                            else: 
+                                params[2] = bool(0)
 
-            self.queues.append(Queue(params[0], params[1], params[2]))
+            new_queue = Queue(self.shared, queue_path=params[0], queue_preset=params[1], is_animation=params[2])
+            new_queue.populate()
+            self.queues.append(new_queue)
 
         os.remove(queue_file)
         self.dump_queues("New queue added from .queue file")
@@ -90,17 +100,21 @@ class Daemon:
         queue_list = self.queues
         for active_queue in queue_list:
             self.shared.update(active_queue=active_queue.snapshot())
-            while active_queue.status not in ["SUCCESS", "FAILED"]:
-                self.active_worker = threading.Thread(target=active_queue.run_next, daemon=True)
+            while active_queue.status not in ["SUCCESS", "FAILED", "WARNING"]:
+                self.active_worker = threading.Thread(target=active_queue.run_next, daemon=False)
+                self.shared.append_thread(self.active_worker)
                 self.active_worker.start()
+                self.set_status("RECODING")
 
                 while self.active_worker.is_alive():
                     self.shared.update(active_queue=active_queue.snapshot())
                     self.dump_queues("Update during recoding")
                     sleep(1)
 
+                self.shared.remove_thread(self.active_worker)
                 self.active_worker = None
                 self.shared.update(active_queue={})
+                self.set_status("WAITING")
                 self.dump_queues("Update after recoding")
 
             self.dump_history(active_queue)
@@ -110,17 +124,33 @@ class Daemon:
     def run(self) -> None:
         while True:
             match self.status:
-                case "WAITING":
+                case "IDLE":
                     self.check_next()
 
                     if self.queues:
-                        self.set_status("RECODING")
+                        self.set_status("WAITING")
                     else:
                         sleep(3)
 
-                case "RECODING":
+                case "WAITING":
                     self.dump_queues("Update before recoding")
                     self.run_queues()
 
                     if not self.queues:
-                        self.set_status("WAITING")
+                        self.set_status("IDLE")
+
+                case "STOPPING":
+                    pass
+
+                    # TO-DO:
+                    # Stop worker on Queue class and set to interrumped
+                    # Stop the SocketHandler
+                    # Wait for all the treads/workers to stop (check the ammount of them on SharedState)
+                    # |-> Only one thread will stay, the daemon one.
+                    # On the start script, only create one thread for the Daemon with darmon=True and exit
+
+
+    # GENERAL TO-DO:
+    # Move the SocketHandler to the Daemon class
+    # Implement https://peps.python.org/pep-3143/
+    # Finish the ArgsParser and cli interface
