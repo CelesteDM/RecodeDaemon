@@ -8,7 +8,7 @@ import json
 from Queue import Queue
 from SharedState import SharedState
 
-class Daemon:
+class Recoder:
     queues: list[Queue] = []
     requests: list[dict] = []
     status = ""
@@ -49,6 +49,9 @@ class Daemon:
         if os.path.exists(self.socket_path):
             os.remove(self.socket_path)
         self.socket.bind(self.socket_path)
+
+    def terminate(self) -> None:
+        self.set_status("STOPPING")
 
     def skt_listen(self) -> None:
         while self.status != "STOPPING":

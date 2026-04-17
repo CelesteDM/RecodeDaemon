@@ -3,6 +3,7 @@
     nativeBuildInputs = with pkgs.buildPackages; [ 
       git
       python313
+      python313Packages.python-daemon
       ffmpeg
     ];
 }
