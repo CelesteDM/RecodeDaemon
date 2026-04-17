@@ -1,10 +1,11 @@
 import socket
 import json
 import sys
+import os.path
 
 def send_command(cmd):
     client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    client.connect("./var/run/recode.sock")
+    client.connect(os.path.expandvars("$XDG_STATE_HOME/recoder/recode.sock"))
 
     request = json.dumps({"cmd": cmd})
     client.sendall(request.encode())

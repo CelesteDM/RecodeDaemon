@@ -19,14 +19,6 @@ class SharedState:
         with self._lock:
             self._data.update(kwargs)
 
-    def append_thread(self, thread: threading.Thread) -> None:
-        with self._lock:
-            self._threads.append(thread)
-
-    def remove_thread(self, thread: threading.Thread) -> None:
-        with self._lock:
-            self._threads.remove(thread)
-
     def append_worker(self, worker: Popen) -> None:
         with self._lock:
             self._workers.append(worker)
@@ -34,6 +26,9 @@ class SharedState:
     def remove_worker(self, worker: Popen) -> None:
         with self._lock:
             self._workers.remove(worker)
+
+    def workers_len(self) -> int:
+        return len(self._workers)
 
     def snapshot(self) -> dict:
         with self._lock:

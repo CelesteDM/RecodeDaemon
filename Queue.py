@@ -144,10 +144,10 @@ class Queue:
             current_item["status"] = "RECODING"
 
             proc = self.get_process(current_item["path"], output_path)
-            self.shared.remove_worker(proc)
+            self.shared.append_worker(proc)
 
             while proc.poll() == None:
-                match self.shared._data["status"]:
+                match self.shared.snapshot()["status"]:
                     case "RECODING":
                         if current_item["status"] == "PAUSED":
                             proc.send_signal(signal.SIGCONT)
@@ -159,6 +159,8 @@ class Queue:
                         if current_item["status"] == "RECODING":
                             proc.send_signal(signal.SIGSTOP)
                             current_item["status"] = "PAUSED"
+                        else:
+                            sleep(1)
                     case _:
                         proc.terminate()
                         current_item["status"] = "INTERRUPTED"

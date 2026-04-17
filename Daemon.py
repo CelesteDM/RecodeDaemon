@@ -3,11 +3,14 @@ import os
 import pickle
 from time import sleep
 import threading
+import socket
+import json
 from Queue import Queue
 from SharedState import SharedState
 
 class Daemon:
     queues: list[Queue] = []
+    requests: list[dict] = []
     status = ""
 
     def __init__(self, shared: SharedState) -> None:
@@ -15,9 +18,19 @@ class Daemon:
         self.state_dir = shared.state_dir
         self.queues_path = os.path.join(self.state_dir, "queues")
         self.history_path = os.path.join(self.state_dir, "history")
+        self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.socket_path = os.path.join(self.state_dir, "recode.sock")
 
         self.init_state_dir()
         self.load_queues()
+        
+        # Socket init
+        self.socket.listen()
+        threading.Thread(
+            target=self.skt_listen,
+            daemon=True
+        ).start()
+
         self.set_status("IDLE")
 
     def init_state_dir(self) -> None:
@@ -32,6 +45,52 @@ class Daemon:
             sys.stderr.write(f"Could not open state directory. PermissionError\n{self.state_dir}: Permission Denied.\n")
             exit(1)
 
+        # Socket bind
+        if os.path.exists(self.socket_path):
+            os.remove(self.socket_path)
+        self.socket.bind(self.socket_path)
+
+    def skt_listen(self) -> None:
+        while self.status != "STOPPING":
+            conn, _ = self.socket.accept()
+            threading.Thread(
+                target=self.skt_handle_request,
+                args=[conn],
+                daemon=True
+            ).start()
+
+        self.socket.close()
+
+    def skt_handle_request(self, conn) -> None:
+        try:
+            data = conn.recv(4096)
+
+            if not data:
+                return
+
+            request = json.loads(data.decode())
+
+            match request["cmd"]:
+                case "status":
+                    response = self.shared.snapshot()
+
+                case "new_queue":
+                    # response = self.create_queue(request)
+                    response = {"error": "not implemented"}
+
+                case "history":
+                    response = self.shared.read_history()
+
+                case _:
+                    response = {"error": "unknown command"}
+
+            conn.sendall((json.dumps(response) + "\n").encode())
+
+        except Exception as e:
+            conn.sendall(json.dumps({"error": str(e)}).encode())
+        finally:
+            conn.close()
+
     def dump_history(self, queue) -> None:
         with open(self.history_path, 'wb') as history_file:
             pickle.dump(queue.snapshot(), history_file)
@@ -40,13 +99,11 @@ class Daemon:
         self.status = status
         self.shared.update(status=status)
 
-    def dump_queues(self, reason) -> None:
-        print(f"Dump requested, reason: {reason}")
+    def dump_queues(self) -> None:
         snapshot = {}
         with open(self.queues_path, 'wb') as queue_file:
             for index, item in enumerate(self.queues):
                 snapshot[index] = item.snapshot()
-                print(f"Dumping: {item.snapshot()}")
                 pickle.dump(snapshot[index], queue_file)
         self.shared.update(queues=snapshot)
 
@@ -59,8 +116,6 @@ class Daemon:
             while state_file.tell() < len:
                 snapshot = pickle.load(state_file)
                 new_queue = Queue(self.shared)
-                print("Restoring queue with this snapshot:")
-                print(snapshot)
                 new_queue.restore(snapshot)
                 queues.append(new_queue)
         if queues:
@@ -89,7 +144,7 @@ class Daemon:
             self.queues.append(new_queue)
 
         os.remove(queue_file)
-        self.dump_queues("New queue added from .queue file")
+        self.dump_queues()
 
     def check_next(self) -> None:
         for obj in os.scandir(self.state_dir):
@@ -102,24 +157,22 @@ class Daemon:
             self.shared.update(active_queue=active_queue.snapshot())
             while active_queue.status not in ["SUCCESS", "FAILED", "WARNING"]:
                 self.active_worker = threading.Thread(target=active_queue.run_next, daemon=False)
-                self.shared.append_thread(self.active_worker)
                 self.active_worker.start()
                 self.set_status("RECODING")
 
                 while self.active_worker.is_alive():
                     self.shared.update(active_queue=active_queue.snapshot())
-                    self.dump_queues("Update during recoding")
+                    self.dump_queues()
                     sleep(1)
 
-                self.shared.remove_thread(self.active_worker)
                 self.active_worker = None
                 self.shared.update(active_queue={})
                 self.set_status("WAITING")
-                self.dump_queues("Update after recoding")
+                self.dump_queues()
 
             self.dump_history(active_queue)
             self.queues.remove(active_queue)
-            self.dump_queues("Update after finishing all queues")
+            self.dump_queues()
 
     def run(self) -> None:
         while True:
@@ -133,24 +186,14 @@ class Daemon:
                         sleep(3)
 
                 case "WAITING":
-                    self.dump_queues("Update before recoding")
+                    self.dump_queues()
                     self.run_queues()
 
                     if not self.queues:
                         self.set_status("IDLE")
 
                 case "STOPPING":
-                    pass
-
-                    # TO-DO:
-                    # Stop worker on Queue class and set to interrumped
-                    # Stop the SocketHandler
-                    # Wait for all the treads/workers to stop (check the ammount of them on SharedState)
-                    # |-> Only one thread will stay, the daemon one.
-                    # On the start script, only create one thread for the Daemon with darmon=True and exit
-
-
-    # GENERAL TO-DO:
-    # Move the SocketHandler to the Daemon class
-    # Implement https://peps.python.org/pep-3143/
-    # Finish the ArgsParser and cli interface
+                    while len(threading.enumerate()) != 1 and self.shared.workers_len() != 0:
+                        sleep(1)
+                    else:
+                        exit(0)
