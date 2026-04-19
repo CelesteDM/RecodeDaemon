@@ -5,6 +5,7 @@ from time import sleep
 import threading
 import socket
 import json
+from struct import pack
 from string import ascii_lowercase
 from Queue import Queue
 from random import choice
@@ -116,11 +117,12 @@ class Recoder:
                 case _:
                     response = {"error": "unknown command"}
 
-            conn.sendall((json.dumps(response) + "\n").encode())
-
         except Exception as e:
-            conn.sendall(json.dumps({"error": str(e)}).encode())
+            response = {"error": str(e)}
         finally:
+            data = json.dumps(response).encode()
+            conn.sendall(pack('>I', len(data)))
+            conn.sendall(data)
             conn.close()
 
     def list_queues(self, completed: bool, all: bool):
@@ -193,19 +195,24 @@ class Recoder:
                 break
 
         if active_queue:
-            self.shared.update(active_queue=active_queue.snapshot())
             while active_queue.status not in ["SUCCESS", "FAILED", "WARNING"]:
                 self.active_worker = threading.Thread(target=active_queue.run_next, daemon=False)
                 self.active_worker.start()
                 self.set_status("RECODING")
+                self.shared.update(active_queue=active_queue.queue_id)
 
+                current_snapshot, last_snapshot = {}, {}
                 while self.active_worker.is_alive():
-                    self.shared.update(active_queue=active_queue.snapshot())
-                    self.dump_queues()
-                    sleep(1)
+                    current_snapshot = active_queue.snapshot()
+                    if last_snapshot:
+                        if last_snapshot != current_snapshot:            
+                            self.dump_queues()
+
+                    last_snapshot = current_snapshot
+                    sleep(3)
 
                 self.active_worker = None
-                self.shared.update(active_queue={})
+                self.shared.update(active_queue="")
                 self.set_status("WAITING")
                 self.dump_queues()
 

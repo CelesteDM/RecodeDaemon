@@ -1,6 +1,8 @@
 import socket
 import json
 import os.path
+import pickle
+from struct import unpack
 
 class cli():
 
@@ -12,15 +14,20 @@ class cli():
         pass
 
     def send_command(self):
-        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        client.connect(os.path.expandvars("$XDG_STATE_HOME/recoder/recode.sock"))
+        conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        conn.connect(os.path.expandvars("$XDG_STATE_HOME/recoder/recode.sock"))
 
         request = json.dumps(self.args)
-        client.sendall(request.encode())
+        conn.sendall(request.encode())
 
-        response = client.recv(4096)
+        response_size = unpack('>I', conn.recv(4))[0]
+        response = b""
+        reamining_payload_size = response_size
+        while reamining_payload_size > 0:
+            response += conn.recv(reamining_payload_size)
+            reamining_payload_size = response_size - len(response)
         answer = json.loads(response.decode())
         for key in answer:
             print(f"{key}: {answer[key]}")
 
-        client.close()
+        conn.close()

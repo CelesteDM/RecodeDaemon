@@ -11,7 +11,7 @@ class SharedState:
         self._threads = []
         self._data = {
             "status": "",
-            "active_queue": {},
+            "active_queue": "",
             "queues": {},
         }
 

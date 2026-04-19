@@ -163,7 +163,7 @@ class Queue:
                         else:
                             try:
                                 proc.communicate(1)
-                            except TimeoutExpired:
+                            except subprocess.TimeoutExpired:
                                 continue
 
                     case "PAUSED":
