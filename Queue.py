@@ -100,7 +100,7 @@ class Queue:
         cmd_audio_mapping, cmd_subtitles_mapping = ["-map", "0:a"], ["-map", "0:s"]
         cmd_video_settings = ["-c:v", "libx265", "-preset", self.queue_preset, "-x265-params", "log-level=none"]
         cmd_audio_settings = ["-c:a", "aac", "-b:a", "192k", "-ac", "2"]
-        cmd_tail = ["-disposition:s:0", "default", "-disposition:s:1", "0", "-c:s", "copy", "-c:t", "copy" ]
+        cmd_tail = ["-disposition:s:0", "default", "-disposition:s:1", "0", "-c:s", "copy", "-c:t", "copy"]
 
         if self.is_animation:
             cmd_video_settings += ["-tune", "animation" ]
@@ -109,29 +109,33 @@ class Queue:
         subtitles_channels = self.get_channels(file_path, "subtitles")
 
         if audio_channels.get(0) != -1:
-            cmd_audio_mapping = []
+            lang_audio_mapping = []
             for stream in audio_channels:
                 match audio_channels.get(stream):
                     case "jpn":
-                        cmd_audio_mapping += ["-map", "0:a:m:language:jpn:?"]
+                        lang_audio_mapping += ["-map", "0:a:m:language:jpn:?"]
                     case "eng":
-                        cmd_audio_mapping += ["-map", "0:a:m:language:eng:?"]
+                        lang_audio_mapping += ["-map", "0:a:m:language:eng:?"]
                     case "spa":
-                        cmd_audio_mapping += ["-map", "0:a:m:language:spa:?"]
+                        lang_audio_mapping += ["-map", "0:a:m:language:spa:?"]
+            if lang_audio_mapping:
+                cmd_audio_mapping = lang_audio_mapping
 
         if subtitles_channels.get(0) != -1:
-            cmd_subtitles_mapping = []
+            lang_subtitles_mapping = []
             for stream in subtitles_channels:
                 match subtitles_channels.get(stream):
                     case "spa":
-                        cmd_subtitles_mapping += ["-map", "0:s:m:language:spa:?"]
+                        lang_subtitles_mapping += ["-map", "0:s:m:language:spa:?"]
                     case "eng":
-                        cmd_subtitles_mapping += ["-map", "0:s:m:language:eng:?"]
+                        lang_subtitles_mapping += ["-map", "0:s:m:language:eng:?"]
                     case "jpn":
-                        cmd_subtitles_mapping += ["-map", "0:s:m:language:jpn:?"]
+                        lang_subtitles_mapping += ["-map", "0:s:m:language:jpn:?"]
+            if lang_subtitles_mapping:
+                cmd_subtitles_mapping = lang_subtitles_mapping
 
         command = cmd_root + cmd_audio_mapping + cmd_subtitles_mapping + cmd_video_settings + cmd_audio_settings + cmd_tail + [output_path]
-        return subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, text=True)
+        return subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, shell=False, text=True)
 
     def run_next(self) -> None:
         current_item = None
@@ -157,7 +161,10 @@ class Queue:
                             proc.send_signal(signal.SIGCONT)
                             current_item["status"] = "RECODING"
                         else:
-                            sleep(1)
+                            try:
+                                proc.communicate(1)
+                            except TimeoutExpired:
+                                continue
 
                     case "PAUSED":
                         if current_item["status"] == "RECODING":
@@ -180,7 +187,7 @@ class Queue:
             elif current_item["status"] != "INTERRUPTED":
                 os.remove(output_path)
                 current_item["status"] = "FAILED"
-                current_item["error"] = proc.stderr.read()
+                current_item["error"] = proc.communicate()[1]
                 current_item["exit_code"] = proc.returncode
                 self.items_done += 1
 
