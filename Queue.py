@@ -9,46 +9,50 @@ class Queue:
     status = "INIT"
     queue = {}
 
-    def __init__(self, shared: SharedState, queue_path=None, queue_preset=None, is_animation=False) -> None:
+    # Queues need to be able to be initiated without values so they can be later restored using the restore() function
+    def __init__(self, shared: SharedState, queue_id="", queue_path=[], queue_preset="", is_animation=False, recursive=False) -> None:
         self.shared = shared
 
+        self.queue_id = queue_id
         self.queue_path = queue_path
         self.queue_preset = queue_preset
         self.is_animation = is_animation
+        self.recursive = recursive
 
         self.next_item = 1
         self.items_done = 0
 
     def populate(self) -> None:
-        scan = os.scandir(self.queue_path)
-        dirs = []
-        files = []
+        for path in self.queue_path:
+            scan = os.scandir(path)
+            dirs = []
+            files = []
 
-        for obj in scan:
-            if obj.is_dir():
-                dirs.append(obj)
-            elif obj.name[-4:] in [".mkv", ".mp4"] and obj.name[:7] != "RECODE_":
-                files.append(obj)
+            for obj in scan:
+                if obj.is_dir() and obj not in dirs:
+                    dirs.append(obj)
+                elif obj.name[-4:] in [".mkv", ".mp4"] and obj.name[:7] != "RECODE_" and obj not in files:
+                    files.append(obj)
 
-        while dirs:
-            for directory in dirs:
-                scan = os.scandir(directory.path)
-                for obj in scan:
-                    if obj.is_dir():
-                        dirs.append(obj)
-                    elif obj.name[-4:] in [".mkv", ".mp4"] and obj.name[:7] != "RECODE_":
-                        files.append(obj)
-                dirs.remove(directory)
+            if self.recursive:
+                while dirs:
+                    scan = os.scandir(dirs[0].path)
+                    for obj in scan:
+                        if obj.is_dir() and obj not in dirs:
+                            dirs.append(obj)
+                        elif obj.name[-4:] in [".mkv", ".mp4"] and obj.name[:7] != "RECODE_" and obj not in files:
+                            files.append(obj)
+                    dirs.remove(dirs[0])
 
-        for index, file in enumerate(files):
-            self.queue[index+1] = {
-                "status": "WAITING",
-                "path": file.path,
-                "name": file.name,
-                "size": file.stat().st_size,
-                    }
-        self.item_count = len(self.queue)
-        self.status = "WAITING"
+            for index, file in enumerate(files):
+                self.queue[index+1] = {
+                    "status": "WAITING",
+                    "path": file.path,
+                    "name": file.name,
+                    "size": file.stat().st_size,
+                        }
+            self.item_count = len(self.queue)
+            self.status = "WAITING"
 
     def set_exit_status(self) -> None:
         failed = 0
@@ -184,6 +188,7 @@ class Queue:
 
     def snapshot(self) -> dict:
         return {
+            "queue_id": self.queue_id,
             "status": self.status,
             "item_count": self.item_count,
             "items_done": self.items_done,
@@ -196,6 +201,7 @@ class Queue:
         }
 
     def restore(self, snapshot: dict):
+        self.queue_id = snapshot["queue_id"]
         self.status = snapshot["status"]
         self.item_count = snapshot["item_count"]
         self.items_done = snapshot["items_done"]

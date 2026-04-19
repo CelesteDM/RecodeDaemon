@@ -38,11 +38,11 @@ class SharedState:
         history_path = os.path.join(self.state_dir, "history")
         if not os.access(history_path, os.F_OK):
             return {}
-        history, index = {}, 0
+        history = {}
         len = os.path.getsize(history_path)
         with open(history_path, 'rb') as history_file:
             while history_file.tell() < len:
-                history[index] = load(history_file)
-                index += 1
+                queue = load(history_file)
+                history[queue["queue_id"]] = queue
         return history
 

@@ -1,19 +1,26 @@
 import socket
 import json
-import sys
 import os.path
 
-def send_command(cmd):
-    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    client.connect(os.path.expandvars("$XDG_STATE_HOME/recoder/recode.sock"))
+class cli():
 
-    request = json.dumps({"cmd": cmd})
-    client.sendall(request.encode())
+    def __init__(self, args):
+        self.args = args
+        self.send_command()
 
-    response = client.recv(4096)
-    print(json.loads(response.decode()))
+    def run(self):
+        pass
 
-    client.close()
+    def send_command(self):
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        client.connect(os.path.expandvars("$XDG_STATE_HOME/recoder/recode.sock"))
 
-if __name__ == "__main__":
-    send_command(sys.argv[1])
+        request = json.dumps(self.args)
+        client.sendall(request.encode())
+
+        response = client.recv(4096)
+        answer = json.loads(response.decode())
+        for key in answer:
+            print(f"{key}: {answer[key]}")
+
+        client.close()

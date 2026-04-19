@@ -5,12 +5,13 @@ from time import sleep
 import threading
 import socket
 import json
+from string import ascii_lowercase
 from Queue import Queue
+from random import choice
 from SharedState import SharedState
 
 class Recoder:
-    queues: list[Queue] = []
-    requests: list[dict] = []
+    queues: dict[str, Queue] = {}
     status = ""
 
     def __init__(self, shared: SharedState) -> None:
@@ -67,22 +68,50 @@ class Recoder:
     def skt_handle_request(self, conn) -> None:
         try:
             data = conn.recv(4096)
-
             if not data:
                 return
 
             request = json.loads(data.decode())
-
             match request["cmd"]:
+
                 case "status":
                     response = self.shared.snapshot()
 
-                case "new_queue":
-                    # response = self.create_queue(request)
-                    response = {"error": "not implemented"}
+                case "daemon":
+                    match request["action"]:
+                        case "stop":
+                            self.terminate()
+                            response = {"status": "done"}
 
-                case "history":
-                    response = self.shared.read_history()
+                        case _:
+                            response = {"error": "unknown command"}
+
+                case "queue":
+                    match request["action"]:
+                        case "create":
+                            queue_id = self.create_queue(
+                                request["path"],
+                                request["preset"],
+                                request["animation"],
+                                request["recursive"])
+                            response = {"status": "done", "queue_id": queue_id}
+
+                        case "list":
+                            response = self.list_queues(
+                                request["completed"],
+                                request["all"])
+
+                        case "delete":
+                            response = {"error": "not implemented"}
+
+                        case "pause":
+                            response = {"error": "not implemented"}
+
+                        case "resume":
+                            response = {"error": "not implemented"}
+
+                        case _:
+                            response = {"error": "unknown command"}
 
                 case _:
                     response = {"error": "unknown command"}
@@ -93,6 +122,37 @@ class Recoder:
             conn.sendall(json.dumps({"error": str(e)}).encode())
         finally:
             conn.close()
+
+    def list_queues(self, completed: bool, all: bool):
+        queues = self.shared.snapshot()["queues"]
+        waiting = {}
+
+        history = self.shared.read_history()
+        for queue_id in self.queues:
+            if queues[queue_id].status in ["COMPLETED", "FAILED"]:
+                history[queue_id] = queues[queue_id]
+            else:
+                waiting[queue_id] = queues[queue_id]
+
+        if not all:
+            if completed:
+                return history
+            else:
+                return waiting
+        else:
+            return waiting | history
+
+
+    def create_queue(self, path: list, preset: str, animation: bool, recursive: bool) -> str:
+        queue_id = ''.join(choice(ascii_lowercase) for _ in range(6))
+        while queue_id in self.queues:
+            queue_id = ''.join(choice(ascii_lowercase) for _ in range(6))
+
+        new_queue = Queue(self.shared, queue_id, path, preset, animation, recursive)
+        new_queue.populate()
+        self.queues[queue_id] = new_queue
+
+        return queue_id
 
     def dump_history(self, queue) -> None:
         with open(self.history_path, 'wb') as history_file:
@@ -105,58 +165,34 @@ class Recoder:
     def dump_queues(self) -> None:
         snapshot = {}
         with open(self.queues_path, 'wb') as queue_file:
-            for index, item in enumerate(self.queues):
-                snapshot[index] = item.snapshot()
-                pickle.dump(snapshot[index], queue_file)
+            for item in self.queues:
+                snapshot[item] = self.queues[item].snapshot()
+                pickle.dump(snapshot[item], queue_file)
         self.shared.update(queues=snapshot)
 
     def load_queues(self) -> None:
         if not os.access(self.queues_path, os.F_OK):
             return
-        queues = []
+        queues = {}
         len = os.path.getsize(self.queues_path)
         with open(self.queues_path, 'rb') as state_file:
             while state_file.tell() < len:
                 snapshot = pickle.load(state_file)
                 new_queue = Queue(self.shared)
                 new_queue.restore(snapshot)
-                queues.append(new_queue)
+                queues[new_queue.queue_id] = new_queue
         if queues:
             self.queues = queues
 
-    def parse_queue(self, queue_file) -> None:
-        params = ["","",bool]
-        with open(queue_file, 'r') as data:
-            for _ in range(len(params)):
-                line = data.readline()
-                if ':' in line:
-                    tokens = line.split(':')
-                    match tokens[0]:
-                        case "path":
-                            params[0] = tokens[1].rstrip()
-                        case "preset":
-                            params[1] = tokens[1].rstrip()
-                        case "is_animation":
-                            if tokens[1].rstrip() == "True":
-                                params[2] = bool(1)
-                            else: 
-                                params[2] = bool(0)
-
-            new_queue = Queue(self.shared, queue_path=params[0], queue_preset=params[1], is_animation=params[2])
-            new_queue.populate()
-            self.queues.append(new_queue)
-
-        os.remove(queue_file)
-        self.dump_queues()
-
-    def check_next(self) -> None:
-        for obj in os.scandir(self.state_dir):
-            if obj.name[-6:] == ".queue":
-                self.parse_queue(obj.path)
-
     def run_queues(self) -> None:
-        queue_list = self.queues
-        for active_queue in queue_list:
+
+        active_queue = ""
+        for queue_id in self.queues:
+            if self.queues[queue_id] not in ["SUCCESS", "FAILED", "WARNING"]:
+                active_queue = self.queues[queue_id]
+                break
+
+        if active_queue:
             self.shared.update(active_queue=active_queue.snapshot())
             while active_queue.status not in ["SUCCESS", "FAILED", "WARNING"]:
                 self.active_worker = threading.Thread(target=active_queue.run_next, daemon=False)
@@ -174,26 +210,24 @@ class Recoder:
                 self.dump_queues()
 
             self.dump_history(active_queue)
-            self.queues.remove(active_queue)
+            self.queues.pop(active_queue.queue_id)
             self.dump_queues()
 
     def run(self) -> None:
         while True:
             match self.status:
                 case "IDLE":
-                    self.check_next()
-
                     if self.queues:
                         self.set_status("WAITING")
                     else:
                         sleep(3)
 
                 case "WAITING":
-                    self.dump_queues()
-                    self.run_queues()
-
                     if not self.queues:
                         self.set_status("IDLE")
+
+                    self.dump_queues()
+                    self.run_queues()
 
                 case "STOPPING":
                     while len(threading.enumerate()) != 1 and self.shared.workers_len() != 0:
