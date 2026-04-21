@@ -14,6 +14,8 @@ from SharedState import SharedState
 class Recoder:
     queues: dict[str, Queue] = {}
     status = ""
+    active_worker = None
+    active_queue = None
 
     def __init__(self, shared: SharedState) -> None:
         self.shared = shared
@@ -67,6 +69,7 @@ class Recoder:
         self.socket.close()
 
     def skt_handle_request(self, conn) -> None:
+        response = {"Achievement!": "How did we get here?"}
         try:
             data = conn.recv(4096)
             if not data:
@@ -85,7 +88,8 @@ class Recoder:
                             response = {"status": "done"}
 
                         case _:
-                            response = {"error": "unknown command"}
+                            response = {"status": "error",
+                                        "error": "unknown command"}
 
                 case "queue":
                     match request["action"]:
@@ -95,7 +99,8 @@ class Recoder:
                                 request["preset"],
                                 request["animation"],
                                 request["recursive"])
-                            response = {"status": "done", "queue_id": queue_id}
+                            response = {"status": "done",
+                                        "queue_id": queue_id}
 
                         case "list":
                             response = self.list_queues(
@@ -103,19 +108,31 @@ class Recoder:
                                 request["all"])
 
                         case "delete":
-                            response = {"error": "not implemented"}
+                            response = self.remove_queue(request["queue_id"])
 
                         case "pause":
-                            response = {"error": "not implemented"}
+                            if self.status != "PAUSED":
+                                self.set_status("PAUSED")
+                                response = {"status": "done"}
+                            else:
+                                response = {"status": "error",
+                                            "error": "already paused"}
 
                         case "resume":
-                            response = {"error": "not implemented"}
+                            if self.status == "PAUSED":
+                                self.set_status("WAITING")
+                                response = {"status": "done"}
+                            else:
+                                response = {"status": "error",
+                                            "error": "not paused"}
 
                         case _:
-                            response = {"error": "unknown command"}
+                            response = {"status": "error",
+                                        "error": "unknown command"}
 
                 case _:
-                    response = {"error": "unknown command"}
+                    response = {"status": "error",
+                                "error": "unknown command"}
 
         except Exception as e:
             response = {"error": str(e)}
@@ -125,13 +142,31 @@ class Recoder:
             conn.sendall(data)
             conn.close()
 
+    def remove_queue(self, queue_ids: list):
+
+        existing_ids = list(self.queues)
+
+        for q_id in queue_ids:
+            if q_id not in existing_ids:
+                return {"status": "error",
+                        "error": "queue not found",
+                        "queue_id": q_id}
+
+        for q_id in queue_ids:
+            del self.queues[q_id]
+
+        self.dump_queues()
+
+        return {"status": "done"}
+            
+
     def list_queues(self, completed: bool, all: bool):
         queues = self.shared.snapshot()["queues"]
         waiting = {}
 
         history = self.shared.read_history()
         for queue_id in self.queues:
-            if queues[queue_id].status in ["COMPLETED", "FAILED"]:
+            if queues[queue_id]["status"] in ["COMPLETED", "FAILED"]:
                 history[queue_id] = queues[queue_id]
             else:
                 waiting[queue_id] = queues[queue_id]
@@ -153,6 +188,7 @@ class Recoder:
         new_queue = Queue(self.shared, queue_id, path, preset, animation, recursive)
         new_queue.populate()
         self.queues[queue_id] = new_queue
+        self.dump_queues()
 
         return queue_id
 
@@ -185,40 +221,47 @@ class Recoder:
                 queues[new_queue.queue_id] = new_queue
         if queues:
             self.queues = queues
+            self.dump_queues()
 
     def run_queues(self) -> None:
-
         active_queue = ""
         for queue_id in self.queues:
             if self.queues[queue_id] not in ["SUCCESS", "FAILED", "WARNING"]:
                 active_queue = self.queues[queue_id]
+                self.shared.update(active_queue=active_queue.queue_id)
                 break
 
         if active_queue:
-            while active_queue.status not in ["SUCCESS", "FAILED", "WARNING"]:
-                self.active_worker = threading.Thread(target=active_queue.run_next, daemon=False)
-                self.active_worker.start()
-                self.set_status("RECODING")
-                self.shared.update(active_queue=active_queue.queue_id)
+
+            while active_queue.status not in ["SUCCESS", "FAILED", "WARNING"] and self.status not in ["STOPPING", "PAUSED"]:
+
+                if not self.active_worker or not self.active_worker.is_alive():
+                    self.active_worker = threading.Thread(target=active_queue.run_next, daemon=False)
+                    self.active_worker.start()
 
                 current_snapshot, last_snapshot = {}, {}
                 while self.active_worker.is_alive():
-                    current_snapshot = active_queue.snapshot()
-                    if last_snapshot:
-                        if last_snapshot != current_snapshot:            
+
+                    match self.status:
+                        case "WAITING":
+                            self.set_status("RECODING")
+
+                        case "RECODING":
+                            current_snapshot = active_queue.snapshot()
+                            if last_snapshot:
+                                if last_snapshot != current_snapshot:
+                                    self.dump_queues()
+                            last_snapshot = current_snapshot
+
+                        case _:
                             self.dump_queues()
+                            break
 
-                    last_snapshot = current_snapshot
-                    sleep(3)
-
-                self.active_worker = None
-                self.shared.update(active_queue="")
-                self.set_status("WAITING")
-                self.dump_queues()
-
-            self.dump_history(active_queue)
-            self.queues.pop(active_queue.queue_id)
-            self.dump_queues()
+                else:
+                    self.set_status("WAITING")
+                    self.shared.update(active_queue="")
+                    del self.queues[active_queue.queue_id]
+                    self.dump_queues()
 
     def run(self) -> None:
         while True:
@@ -229,12 +272,16 @@ class Recoder:
                     else:
                         sleep(3)
 
+                case "PAUSED":
+                    self.dump_queues()
+                    sleep(1)
+
                 case "WAITING":
                     if not self.queues:
                         self.set_status("IDLE")
-
-                    self.dump_queues()
-                    self.run_queues()
+                    else:
+                        self.dump_queues()
+                        self.run_queues()
 
                 case "STOPPING":
                     while len(threading.enumerate()) != 1 and self.shared.workers_len() != 0:

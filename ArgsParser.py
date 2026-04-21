@@ -61,7 +61,7 @@ def parse_args() -> dict:
     # Queue delete subcommand
     queue_delete_parser = queue_subparsers.add_parser("delete", description="Delete existing queues.", help="queue deleting help")
     queue_delete_parser.set_defaults(action="delete")
-    queue_delete_parser.add_argument("id", action="extend", nargs="+", type=str, help="List of queue ids to be deleted")
+    queue_delete_parser.add_argument("-i", "--queue-id", action="extend", nargs="+", type=str, help="List of queue ids to be deleted")
 
     # Queue pause subcommand
     queue_pause_parser = queue_subparsers.add_parser("pause", description="Pause the active queue.")

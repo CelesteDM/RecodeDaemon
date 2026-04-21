@@ -148,30 +148,35 @@ class Queue:
         else:
 
             output_path = os.path.join(os.path.dirname(current_item["path"]), f"RECODE_{current_item['name']}")
-            self.status = "RECODING"
-            current_item["status"] = "RECODING"
-
             proc = self.get_process(current_item["path"], output_path)
             self.shared.append_worker(proc)
 
-            while proc.poll() == None:
+            while proc.poll() is None:
                 match self.shared.snapshot()["status"]:
                     case "RECODING":
-                        if current_item["status"] == "PAUSED":
+                        if self.status != "RECODING":
+                            self.status = "RECODING"
                             proc.send_signal(signal.SIGCONT)
                             current_item["status"] = "RECODING"
-                        else:
-                            try:
-                                proc.communicate(1)
-                            except subprocess.TimeoutExpired:
-                                continue
+
+                        try:
+                            proc.communicate(timeout=1)
+                        except subprocess.TimeoutExpired:
+                            continue
 
                     case "PAUSED":
-                        if current_item["status"] == "RECODING":
-                            proc.send_signal(signal.SIGSTOP)
+                        if self.status != "PAUSED":
                             current_item["status"] = "PAUSED"
-                        else:
-                            sleep(1)
+                            self.status = "PAUSED"
+                            proc.send_signal(signal.SIGSTOP)
+                        sleep(1)
+
+                    case "WAITING":
+                        if self.status != "WAITING":
+                            current_item["status"] = "WAITING"
+                            self.status = "WAITING"
+                        sleep(1)
+
                     case _:
                         proc.terminate()
                         current_item["status"] = "INTERRUPTED"

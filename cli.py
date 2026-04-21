@@ -10,12 +10,13 @@ class cli():
         self.args = args
         self.send_command()
 
-    def run(self):
-        pass
-
-    def send_command(self):
+    def send_command(self) -> int:
         conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        conn.connect(os.path.expandvars("$XDG_STATE_HOME/recoder/recode.sock"))
+        try:
+            conn.connect(os.path.expandvars("$XDG_STATE_HOME/recoder/recode.sock"))
+        except ConnectionRefusedError:
+            print("Socket not responding, is the daemon running?")
+            exit(2)
 
         request = json.dumps(self.args)
         conn.sendall(request.encode())
@@ -31,3 +32,7 @@ class cli():
             print(f"{key}: {answer[key]}")
 
         conn.close()
+        if answer["status"] == "error":
+            exit(1)
+        else:
+            exit(0)
