@@ -48,6 +48,7 @@ def parse_args() -> dict:
     queue_create_parser.set_defaults(action="create")
     queue_create_parser.add_argument("path", action="extend", nargs="+", type=str, help="Path or paths to the file or directory to be recoded")
     queue_create_parser.add_argument("-r", "--recursive", action="store_true", help="Use recursive search on the specified directories paths")
+    queue_create_parser.add_argument("-b", "--backup-path", default="", help="Directory path where backup of files will be stored, if left empty or unspecified the files will be overwritten without backup")
     queue_create_parser.add_argument("-a", "--animation", action="store_true", help="Tunes the H265 encoder for better results on animation cartoons")
     queue_create_parser.add_argument("-p", "--preset", choices=["ultrafast","superfast","veryfast","faster","fast","medium","slow","slower","veryslow"], default="medium", help="H264 encoder preset speed, slower options provide better compression. If you are looking for small file size, use the slowest preset that you have patience for")
 

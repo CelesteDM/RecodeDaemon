@@ -2,6 +2,7 @@ import os
 import subprocess
 import signal
 from time import sleep
+from shutil import copy
 from SharedState import SharedState
 
 class Queue:
@@ -10,7 +11,7 @@ class Queue:
     queue = {}
 
     # Queues need to be able to be initiated without values so they can be later restored using the restore() function
-    def __init__(self, shared: SharedState, queue_id="", queue_path=[], queue_preset="", is_animation=False, recursive=False) -> None:
+    def __init__(self, shared: SharedState, queue_id="", queue_path=[], queue_preset="", is_animation=False, recursive=False, backup_path="") -> None:
         self.shared = shared
 
         self.queue_id = queue_id
@@ -18,6 +19,7 @@ class Queue:
         self.queue_preset = queue_preset
         self.is_animation = is_animation
         self.recursive = recursive
+        self.backup_path = backup_path
 
         self.next_item = 1
         self.items_done = 0
@@ -147,6 +149,11 @@ class Queue:
             self.set_exit_status()
         else:
 
+            if self.backup_path:
+                backup_path = os.path.join(self.backup_path, current_item['name'])
+                if not os.path.exists(backup_path):
+                    copy(current_item['path'], backup_path)
+
             output_path = os.path.join(os.path.dirname(current_item["path"]), f"RECODE_{current_item['name']}")
             proc = self.get_process(current_item["path"], output_path)
             self.shared.append_worker(proc)
@@ -209,6 +216,7 @@ class Queue:
             "config": {
                 "preset": self.queue_preset,
                 "is_animation": self.is_animation,
+                "backup_path": self.backup_path,
             },
         }
 
@@ -219,6 +227,7 @@ class Queue:
         self.items_done = snapshot["items_done"]
         self.queue_preset = snapshot["config"]["preset"]
         self.is_animation = snapshot["config"]["is_animation"]
+        self.backup_path = snapshot["config"]["backup_path"]
         for index in snapshot["items"]:
             self.queue[index] = {
                 "status": snapshot["items"][index]["status"],

@@ -107,7 +107,8 @@ class Recoder:
                                 request["path"],
                                 request["preset"],
                                 request["animation"],
-                                request["recursive"])
+                                request["recursive"],
+                                request["backup_path"])
                             response = {"status": "done",
                                         "queue_id": queue_id}
 
@@ -181,19 +182,19 @@ class Recoder:
 
         if not all:
             if completed:
-                return history
+                return {"status": "done", "queues": history}
             else:
-                return waiting
+                return {"status": "done", "queues": waiting}
         else:
-            return waiting | history
+            return {"status": "done", "queues": waiting | history}
 
 
-    def create_queue(self, path: list, preset: str, animation: bool, recursive: bool) -> str:
+    def create_queue(self, path: list, preset: str, animation: bool, recursive: bool, backup_path: str) -> str:
         queue_id = ''.join(choice(ascii_lowercase) for _ in range(6))
         while queue_id in self.queues:
             queue_id = ''.join(choice(ascii_lowercase) for _ in range(6))
 
-        new_queue = Queue(self.shared, queue_id, path, preset, animation, recursive)
+        new_queue = Queue(self.shared, queue_id, path, preset, animation, recursive, backup_path)
         new_queue.populate()
         self.queues[queue_id] = new_queue
         self.dump_queues()
@@ -265,11 +266,12 @@ class Recoder:
                             self.dump_queues()
                             break
 
-                else:
-                    self.set_status("WAITING")
-                    self.shared.update(active_queue="")
-                    del self.queues[active_queue.queue_id]
-                    self.dump_queues()
+            else:
+                self.set_status("WAITING")
+                self.shared.update(active_queue="")
+                self.dump_history(self.queues[active_queue.queue_id])
+                del self.queues[active_queue.queue_id]
+                self.dump_queues()
 
     def run(self) -> None:
         while True:
