@@ -11,7 +11,7 @@ def main() -> None:
         shared = SharedState(args["state"])
         print("status: done")
         with DaemonContext():
-            Recoder(shared).run()
+            Recoder(shared, args["port"]).run()
     else:
         cli(args)
 

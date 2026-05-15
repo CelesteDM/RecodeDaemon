@@ -5,7 +5,7 @@ from time import sleep
 import threading
 import socket
 import json
-from struct import pack
+from struct import pack, unpack
 from string import ascii_lowercase
 from Queue import Queue
 from random import choice
@@ -17,18 +17,18 @@ class Recoder:
     active_worker = None
     active_queue = None
 
-    def __init__(self, shared: SharedState) -> None:
+    def __init__(self, shared: SharedState, skt_port: int) -> None:
         self.shared = shared
         self.state_dir = shared.state_dir
         self.queues_path = os.path.join(self.state_dir, "queues")
         self.history_path = os.path.join(self.state_dir, "history")
-        self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.socket_path = os.path.join(self.state_dir, "recode.sock")
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         self.init_state_dir()
         self.load_queues()
-        
+
         # Socket init
+        self.socket.bind(("127.0.0.1", skt_port))
         self.socket.listen()
         threading.Thread(
             target=self.skt_listen,
@@ -49,11 +49,6 @@ class Recoder:
             sys.stderr.write(f"Could not open state directory. PermissionError\n{self.state_dir}: Permission Denied.\n")
             exit(1)
 
-        # Socket bind
-        if os.path.exists(self.socket_path):
-            os.remove(self.socket_path)
-        self.socket.bind(self.socket_path)
-
     def terminate(self) -> None:
         self.set_status("STOPPING")
 
@@ -68,14 +63,28 @@ class Recoder:
 
         self.socket.close()
 
+    def skt_send(self, conn, message) -> None:
+        data = message.encode()
+        conn.sendall(pack('>I', len(data)))
+        conn.sendall(data)
+
+    def skt_receive(self, conn) -> str:
+        response_size = unpack('>I', conn.recv(4))[0]
+        response = b""
+        reamining_payload_size = response_size
+        while reamining_payload_size > 0:
+            response += conn.recv(reamining_payload_size)
+            reamining_payload_size = response_size - len(response)
+        return response.decode()
+
     def skt_handle_request(self, conn) -> None:
         response = {"Achievement!": "How did we get here?"}
         try:
-            data = conn.recv(4096)
+            data = self.skt_receive(conn)
             if not data:
                 return
 
-            request = json.loads(data.decode())
+            request = json.loads(data)
             match request["cmd"]:
 
                 case "status":
@@ -137,9 +146,8 @@ class Recoder:
         except Exception as e:
             response = {"error": str(e)}
         finally:
-            data = json.dumps(response).encode()
-            conn.sendall(pack('>I', len(data)))
-            conn.sendall(data)
+            data = json.dumps(response)
+            self.skt_send(conn, data)
             conn.close()
 
     def remove_queue(self, queue_ids: list):

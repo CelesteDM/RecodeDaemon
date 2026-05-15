@@ -9,6 +9,7 @@ def parse_args() -> dict:
                 add_help=True,
                 allow_abbrev=True,
                 exit_on_error=True)
+    parser.add_argument("-p", "--port", default="5300", type=int, help="Set the daemon socket port [default=5300]")
 
     subparsers = parser.add_subparsers()
 
