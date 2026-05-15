@@ -1,7 +1,6 @@
 import socket
 import json
 import os.path
-import pickle
 from struct import unpack
 
 class cli():

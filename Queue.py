@@ -158,11 +158,11 @@ class Queue:
                             self.status = "RECODING"
                             proc.send_signal(signal.SIGCONT)
                             current_item["status"] = "RECODING"
-
-                        try:
-                            proc.communicate(timeout=1)
-                        except subprocess.TimeoutExpired:
-                            continue
+                        else:
+                            try:
+                                proc.communicate(1)
+                            except subprocess.TimeoutExpired:
+                                continue
 
                     case "PAUSED":
                         if self.status != "PAUSED":

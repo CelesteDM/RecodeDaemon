@@ -9,6 +9,7 @@ def main() -> None:
 
     if args["cmd"] == "daemon" and args["action"] == "run":
         shared = SharedState(args["state"])
+        print("status: done")
         with DaemonContext():
             Recoder(shared).run()
     else:
