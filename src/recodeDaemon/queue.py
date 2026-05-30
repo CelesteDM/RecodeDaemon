@@ -3,7 +3,7 @@ import subprocess
 import signal
 from time import sleep
 from shutil import copy
-from SharedState import SharedState
+from .sharedState import SharedState
 
 class Queue:
 

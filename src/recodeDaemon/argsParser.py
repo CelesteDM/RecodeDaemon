@@ -11,7 +11,7 @@ def parse_args() -> dict:
                 exit_on_error=True)
     parser.add_argument("-p", "--port", default="5300", type=int, help="Set the daemon socket port [default=5300]")
 
-    subparsers = parser.add_subparsers()
+    subparsers = parser.add_subparsers(required=True)
 
 
     #---------------------------------------------------------------------------------
@@ -19,12 +19,13 @@ def parse_args() -> dict:
     # Daemon subcommand
     daemon_parser = subparsers.add_parser("daemon", description="Daemon management.", help="daemon help")
     daemon_parser.set_defaults(cmd="daemon")
-    daemon_subparsers = daemon_parser.add_subparsers()
+    daemon_subparsers = daemon_parser.add_subparsers(required=True)
 
     # Daemon run subcommand
     daemon_run_parser = daemon_subparsers.add_parser("run", description="Run the recoder daemon.", help="daemon run help")
     daemon_run_parser.set_defaults(action="run")
     daemon_run_parser.add_argument("--state", default="$XDG_STATE_HOME/recoder", help="Set the daemon state directory. Expands environment variables")
+    daemon_run_parser.add_argument("-d", "--daemon", action="store_true", help="Run the daemon as a background process")
 
     # Daemon stop subcommand
     daemon_stop_parser = daemon_subparsers.add_parser("stop", description="Stop the recoder daemon.", help="daemon stop help")
@@ -41,7 +42,7 @@ def parse_args() -> dict:
     # Queue subcommand
     queue_parser = subparsers.add_parser("queue", description="Queue management.", help="queue managing help")
     queue_parser.set_defaults(cmd="queue")
-    queue_subparsers = queue_parser.add_subparsers()
+    queue_subparsers = queue_parser.add_subparsers(required=True)
 
     # Queue create subcommand
     queue_create_parser = queue_subparsers.add_parser("create", description="Create recoding queues.", help="queue creation help")

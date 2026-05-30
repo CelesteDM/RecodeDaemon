@@ -7,9 +7,9 @@ import socket
 import json
 from struct import pack, unpack
 from string import ascii_lowercase
-from Queue import Queue
+from .queue import Queue
 from random import choice
-from SharedState import SharedState
+from .sharedState import SharedState
 
 class Recoder:
     queues: dict[str, Queue] = {}
@@ -149,7 +149,6 @@ class Recoder:
         finally:
             data = json.dumps(response)
             self.skt_send(conn, data)
-            conn.close()
 
     def remove_queue(self, queue_ids: list):
 

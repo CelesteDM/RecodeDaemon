@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "recodeDaemon"
+authors = [
+    {name = "Celeste Di Costa Martinelli", email = "celestedicostamartinelli@gmail.com"},
+]
+description = "Recoding daemon for media services"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "python-daemon",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: Unix",
+]
+dynamic = ["version"]
+
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+
+[project.scripts]
+recoder = "recodeDaemon.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/CelesteDM/RecodeDaemon"
+Issues = "https://github.com/CelesteDM/RecodeDaemon/issues"
