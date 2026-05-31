@@ -36,6 +36,7 @@ def parse_args() -> dict:
     # Status subcommand
     status_parser = subparsers.add_parser("status", description="Get the daemon and queues status.", help="status help")
     status_parser.set_defaults(cmd="status")
+    status_parser.add_argument("-r", "--raw", action="store_true", help="Output raw json values")
 
     #---------------------------------------------------------------------------------
 

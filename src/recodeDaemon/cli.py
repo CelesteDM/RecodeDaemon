@@ -18,8 +18,19 @@ def main() -> None:
             Recoder(shared, args["port"]).run()
 
     elif args["cmd"] == "status":
-        status_loop(args["port"])
-        exit(0)
+        if args["raw"]:
+            conn = skt_connect(args["port"])
+            if not conn:
+                print("Socket not responding, is the daemon running?")
+                exit(2)
+            message = json.dumps(args)
+            answer = skt_communicate(conn, message)
+            print(answer)
+            exit(0)
+
+        else:
+            status_loop(args["port"])
+            exit(0)
 
     else:
         conn = skt_connect(args["port"])
@@ -27,8 +38,8 @@ def main() -> None:
             print("Socket not responding, is the daemon running?")
             exit(2)
         message = json.dumps(args)
-
         answer = skt_communicate(conn, message)
+
         for key in answer:
             print(f"{key}: {answer[key]}")
 
