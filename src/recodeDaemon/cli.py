@@ -17,13 +17,16 @@ def main() -> None:
         else:
             Recoder(shared, args["port"]).run()
 
+    elif args["cmd"] == "status":
+        status_loop(args["port"])
+        exit(0)
+
     else:
         conn = skt_connect(args["port"])
+        if not conn:
+            print("Socket not responding, is the daemon running?")
+            exit(2)
         message = json.dumps(args)
-
-        if args["cmd"] == "status":
-            status_loop(args["port"])
-            exit(0)
 
         answer = skt_communicate(conn, message)
         for key in answer:

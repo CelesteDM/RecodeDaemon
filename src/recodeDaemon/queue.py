@@ -167,7 +167,7 @@ class Queue:
                             current_item["status"] = "RECODING"
                         else:
                             try:
-                                proc.communicate(1)
+                                proc.communicate(timeout=1)
                             except subprocess.TimeoutExpired:
                                 continue
 
@@ -184,9 +184,16 @@ class Queue:
                             self.status = "WAITING"
                         sleep(1)
 
-                    case _:
+                    case "STOPPING":
+                        # Needed for process to terminate
+                        if self.status == "PAUSED":
+                            proc.send_signal(signal.SIGCONT)
+
+                        if self.status != "STOPPING":
+                            self.status = "STOPPING"
+                            current_item["status"] = "INTERRUPTED"
                         proc.terminate()
-                        current_item["status"] = "INTERRUPTED"
+                        sleep(1)
 
             self.shared.remove_worker(proc)
 

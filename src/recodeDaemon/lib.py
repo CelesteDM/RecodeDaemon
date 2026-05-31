@@ -7,8 +7,7 @@ def skt_connect(port):
     try:
         conn.connect(("127.0.0.1", port))
     except ConnectionRefusedError:
-        print("Socket not responding, is the daemon running?")
-        exit(2)
+        return None
     return conn
 
 def skt_communicate(conn, message) -> dict:

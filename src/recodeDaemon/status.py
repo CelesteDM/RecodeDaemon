@@ -29,34 +29,40 @@ def print_status(message={}) -> None:
     print("├" + "─"*(width-2) + "┤")
     
     # Body
-    columns = "│" + "{:^{spacing}}"*5 + "│"
+    spacing = int((width-2)/5)
+    diff = width - ((spacing*5)+2)
+    columns = "│" + "{:^{spacing}}"*5 + " "*diff + "│"
+
     v = ["ID", "STATUS", "ITEMS", "REMAINING", "FINISHED"]
-    print(columns.format(v[0], v[1], v[2], v[3], v[4], spacing=int((width-2)/len(v))))
+    print(columns.format(v[0], v[1], v[2], v[3], v[4], spacing=spacing))
     print("├" + "┄"*(width-2) + "┤")
 
     # Per queue values
     for queue_id in message["queues"]:
         queue = message["queues"][queue_id]
         v = [queue["queue_id"], queue["status"].lower(), queue["item_count"], queue["items_remaining"], queue["items_done"]]
-        print(columns.format(v[0], v[1], v[2], v[3], v[4], spacing=int((width-2)/len(v))))
+        print(columns.format(v[0], v[1], v[2], v[3], v[4], spacing=spacing))
 
         # Active queue files
         if queue["queue_id"] == message["active_queue"]:
 
-            line = "│" + "{:^{spacing}}"*5 + "│"
+            line = "│" + "{:^{spacing}}"*5 + " "*diff + "│"
 
             for item_id in iter(queue["items"]):
                 item = queue["items"][item_id]
 
                 char = "└" if int(item_id) == len(queue["items"]) else "├"
-                print(line.format(char, item["status"].lower(), item["name"], f"Size: {item["size"]//(1024**2)}M", "", spacing=int((width-2)/len(v))))
+                print(line.format(char, item["status"].lower(), item["name"], f"Size: {item["size"]//(1024**2)}M", "", spacing=spacing))
 
     print("└" + "─"*(width-2) + "┘")
 
 def update():
     global PREV_ANSWER
     conn = skt_connect(SKT_PORT)
-    answer = skt_communicate(conn, '{"cmd": "status"}')
+    if conn:
+        answer = skt_communicate(conn, '{"cmd": "status"}')
+    else:
+        answer = {"status": "NOT RUNNING", "active_queue": "", "queues": {}}
     if answer != PREV_ANSWER:
         PREV_ANSWER = answer
         print_status(answer)
