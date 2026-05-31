@@ -1,8 +1,9 @@
 from .lib import *
 from time import sleep
 import signal
-from os import get_terminal_size
+from shutil import get_terminal_size
 from os import system
+from json import dumps
 
 TERM_WIDTH = 0
 PREV_ANSWER = {}
@@ -56,7 +57,7 @@ def print_status(message={}) -> None:
 
     print("└" + "─"*(width-2) + "┘")
 
-def update():
+def update_status():
     global PREV_ANSWER
     conn = skt_connect(SKT_PORT)
     if conn:
@@ -75,7 +76,44 @@ def status_loop(port):
         signal.signal(signal.SIGWINCH, update_term_size)
         TERM_WIDTH, _ = get_terminal_size()
         while True:
-            update()
+            update_status()
             sleep(1)
     except KeyboardInterrupt:
         print('\033[?25h', end="")
+
+def list_queues(args):
+    width, _ = get_terminal_size()
+
+    conn = skt_connect(args["port"])
+    if conn:
+        answer = skt_communicate(conn, dumps(args))
+    else:
+        answer = {}
+
+    i = False
+    for queue_id in answer["queues"]:
+        queue = answer["queues"][queue_id]
+
+        if i:
+            print("\n\n\n")
+        else:
+            i = True
+
+        print(f"Queue ID: {queue_id}")
+        print(f"Status: {queue['status']}")
+
+        print()
+        print(f"Items Done: {queue['items_done']}/{queue['item_count']}")
+
+        for item_num in queue["items"]:
+            item = queue["items"][item_num]
+            print(f"Name: {item['name']} | Status: {item['status']} | size: {item['size']//(1024**2)}M")
+            print(f"Full path: {item['path']}")
+            print()
+
+        print("Queue config:")
+        print(f"Animation: {queue['config']['is_animation']}")
+        print(f"Preset: {queue['config']['preset']}")
+        print(f"Backup path: {queue['config']['backup_path']}")
+
+

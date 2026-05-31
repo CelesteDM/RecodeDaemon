@@ -1,7 +1,7 @@
 from .argsParser import parse_args
 from .sharedState import SharedState
 from .recoder import Recoder
-from .status import status_loop
+from .status import status_loop, list_queues
 from .lib import *
 from daemon import DaemonContext
 
@@ -30,6 +30,10 @@ def main() -> None:
 
         else:
             status_loop(args["port"])
+            exit(0)
+
+    elif args["cmd"] == "queue" and args["action"] == "list":
+            list_queues(args)
             exit(0)
 
     else:
