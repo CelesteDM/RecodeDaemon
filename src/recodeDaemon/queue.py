@@ -11,7 +11,7 @@ class Queue:
     queue = {}
 
     # Queues need to be able to be initiated without values so they can be later restored using the restore() function
-    def __init__(self, shared: SharedState, queue_id="", queue_path=[], queue_preset="", is_animation=False, recursive=False, backup_path="") -> None:
+    def __init__(self, shared: SharedState, queue_id="", queue_path=[], queue_preset="", is_animation=False, recursive=False, backup_path="", output_path="") -> None:
         self.shared = shared
 
         self.queue_id = queue_id
@@ -20,6 +20,7 @@ class Queue:
         self.is_animation = is_animation
         self.recursive = recursive
         self.backup_path = backup_path
+        self.output_path = output_path
 
         self.next_item = 1
         self.items_done = 0
@@ -154,8 +155,8 @@ class Queue:
                 if not os.path.exists(backup_path):
                     copy(current_item['path'], backup_path)
 
-            output_path = os.path.join(os.path.dirname(current_item["path"]), f"RECODE_{current_item['name']}")
-            proc = self.get_process(current_item["path"], output_path)
+            temp_path = os.path.join(os.path.dirname(current_item["path"]), f"RECODE_{current_item['name']}")
+            proc = self.get_process(current_item["path"], temp_path)
             self.shared.append_worker(proc)
 
             while proc.poll() is None:
@@ -195,16 +196,30 @@ class Queue:
                         proc.terminate()
                         sleep(1)
 
+                    case "REMOVING":
+                        # Needed for process to terminate
+                        if self.status == "PAUSED":
+                            proc.send_signal(signal.SIGCONT)
+
+                        if self.status != "REMOVING":
+                            self.status = "REMOVING"
+                            current_item["status"] = "INTERRUPTED"
+                        proc.terminate()
+                        sleep(1)
+
             self.shared.remove_worker(proc)
 
             # Steps after recoding depending on item status:
             if proc.returncode == 0:
-                os.replace(output_path, current_item["path"])
+                if self.output_path:
+                    os.replace(temp_path, os.path.join(self.output_path, current_item["name"]))
+                else:
+                    os.replace(temp_path, current_item["path"])
                 current_item["status"] = "SUCCESS"
                 self.items_done += 1
 
             elif current_item["status"] != "INTERRUPTED":
-                os.remove(output_path)
+                os.remove(temp_path)
                 current_item["status"] = "FAILED"
                 current_item["error"] = proc.communicate()[1]
                 current_item["exit_code"] = proc.returncode
@@ -224,6 +239,7 @@ class Queue:
                 "preset": self.queue_preset,
                 "is_animation": self.is_animation,
                 "backup_path": self.backup_path,
+                "output_path": self.output_path,
             },
         }
 
@@ -235,6 +251,7 @@ class Queue:
         self.queue_preset = snapshot["config"]["preset"]
         self.is_animation = snapshot["config"]["is_animation"]
         self.backup_path = snapshot["config"]["backup_path"]
+        self.output_path = snapshot["config"]["output_path"]
         for index in snapshot["items"]:
             self.queue[index] = {
                 "status": snapshot["items"][index]["status"],

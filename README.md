@@ -1,6 +1,6 @@
-# recodeDaemon
+# RecodeDaemon
 
-A media recoding daemon for queue-based transcoding workflows.
+A media HVEC recoding daemon for queue-based transcoding workflows.
 
 ---
 
@@ -89,3 +89,44 @@ $ pip install .
 ```
 
 ## Usage
+For a full list of options use the `-h / --help` flag in any of the subcommands.
+
+Run the daemon:
+```
+recoder daemon run
+```
+Can be also launched as a backbround process using `-d / --daemon` flag.
+To stop the daemon, use the `daemon stop` subcommand instead.
+Both the daemon and all the cli commands support using a different port with the `-p / --port` flag.
+
+Create a recoding queue:
+```
+recoder queue create /path/to/files
+```
+If no output options are specified, the files will be ovewritten in place, this can be changed using the `-o / --output` flag to specify an output directory, or the `-b / --backup` flag to specify a directory where the original files will be copied to.
+Both the preset velocity can be specified using its name with the `-p / --preset` flag.
+For a full list of presets, check [the h265 coding docs](https://x265.readthedocs.io/en/stable/presets.html#presets).
+An animation flag is available for the [animation tuning](https://x265.readthedocs.io/en/stable/presets.html#tuning).
+
+Check daemon status:
+```
+recoder status
+```
+If instead you only need the raw data to use in scripts, use the `-r / --raw` flag.
+
+Delete one or more queues:
+```
+recoder queue delete <queue-ids>
+```
+
+List queues:
+```
+recoder queue list
+```
+The default option shows the active and waiting queues, the completed queues can be shown adding the `-a / --all` or `-c / --completed` flags.
+
+Pause and resume the daemon:
+```
+recoder queue pause
+recoder queue resume
+```

@@ -51,21 +51,20 @@ def parse_args() -> dict:
     queue_create_parser.add_argument("path", action="extend", nargs="+", type=str, help="Path or paths to the file or directory to be recoded")
     queue_create_parser.add_argument("-r", "--recursive", action="store_true", help="Use recursive search on the specified directories paths")
     queue_create_parser.add_argument("-b", "--backup-path", default="", help="Directory path where backup of files will be stored, if left empty or unspecified the files will be overwritten without backup")
+    queue_create_parser.add_argument("-o", "--output-path", default="", help="Directory path where recoded files will be stored, if left empty or unspecified the files will be overwritten in place")
     queue_create_parser.add_argument("-a", "--animation", action="store_true", help="Tunes the H265 encoder for better results on animation cartoons")
     queue_create_parser.add_argument("-p", "--preset", choices=["ultrafast","superfast","veryfast","faster","fast","medium","slow","slower","veryslow"], default="medium", help="H264 encoder preset speed, slower options provide better compression. If you are looking for small file size, use the slowest preset that you have patience for")
 
     # Queue list subcommand
     queue_list_parser = queue_subparsers.add_parser("list", description="Show information on existing and completed queues.", help="queue listing help")
     queue_list_parser.set_defaults(action="list")
-    queue_list_parser.add_argument("-q", "--quiet", action="store_true", help="Print only queue information, ommitting its files")
     queue_list_parser.add_argument("-a", "--all", action="store_true", help="Print both loaded queues and completed queues")
     queue_list_parser.add_argument("-c", "--completed", action="store_true", help="Print only the history of completed queues")
-    queue_list_parser.add_argument("-s", "--stats", action="store_true", help="Print stats about file size and recode time")
 
     # Queue delete subcommand
     queue_delete_parser = queue_subparsers.add_parser("delete", description="Delete existing queues.", help="queue deleting help")
     queue_delete_parser.set_defaults(action="delete")
-    queue_delete_parser.add_argument("-i", "--queue-id", action="extend", nargs="+", type=str, help="List of queue ids to be deleted")
+    queue_delete_parser.add_argument("ids", action="extend", nargs="+", type=str, help="Queue ids to be deleted")
 
     # Queue pause subcommand
     queue_pause_parser = queue_subparsers.add_parser("pause", description="Pause the active queue.")

@@ -108,7 +108,8 @@ class Recoder:
                                 request["preset"],
                                 request["animation"],
                                 request["recursive"],
-                                request["backup_path"])
+                                request["backup_path"],
+                                request["output_path"])
                             response = {"status": "done",
                                         "queue_id": queue_id}
 
@@ -118,7 +119,7 @@ class Recoder:
                                 request["all"])
 
                         case "delete":
-                            response = self.remove_queue(request["queue_id"])
+                            response = self.remove_queue(request["ids"])
 
                         case "pause":
                             if self.status != "PAUSED":
@@ -144,14 +145,13 @@ class Recoder:
                     response = {"status": "error",
                                 "error": "unknown command"}
 
-        except Exception as e:
-            response = {"error": str(e)}
+        # except Exception as e:
+        #     response = {"status": "error", "error": str(e)}
         finally:
             data = json.dumps(response)
             self.skt_send(conn, data)
 
     def remove_queue(self, queue_ids: list):
-
         existing_ids = list(self.queues)
 
         for q_id in queue_ids:
@@ -161,9 +161,14 @@ class Recoder:
                         "queue_id": q_id}
 
         for q_id in queue_ids:
+            if q_id == self.shared.snapshot()["active_queue"]:
+                self.set_status("REMOVING")
+                while self.shared.workers_len() != 0:
+                    sleep(1)
             del self.queues[q_id]
 
         self.dump_queues()
+        self.set_status("WAITING")
 
         return {"status": "done"}
             
@@ -188,12 +193,12 @@ class Recoder:
             return {"status": "done", "queues": waiting | history}
 
 
-    def create_queue(self, path: list, preset: str, animation: bool, recursive: bool, backup_path: str) -> str:
+    def create_queue(self, path: list, preset: str, animation: bool, recursive: bool, backup_path: str, output_path: str) -> str:
         queue_id = ''.join(choice(ascii_lowercase) for _ in range(6))
         while queue_id in self.queues:
             queue_id = ''.join(choice(ascii_lowercase) for _ in range(6))
 
-        new_queue = Queue(self.shared, queue_id, path, preset, animation, recursive, backup_path)
+        new_queue = Queue(self.shared, queue_id, path, preset, animation, recursive, backup_path, output_path)
         new_queue.populate()
         self.queues[queue_id] = new_queue
         self.dump_queues()
@@ -241,7 +246,7 @@ class Recoder:
 
         if active_queue:
 
-            while active_queue.status not in ["SUCCESS", "FAILED", "WARNING"] and self.status not in ["STOPPING", "PAUSED"]:
+            while active_queue.status not in ["SUCCESS", "FAILED", "WARNING"] and self.status not in ["STOPPING", "PAUSED", "REMOVING"]:
 
                 if not self.active_worker or not self.active_worker.is_alive():
                     self.active_worker = threading.Thread(target=active_queue.run_next, daemon=False)
@@ -267,7 +272,7 @@ class Recoder:
                             self.dump_queues()
                             break
 
-            if self.status not in ["STOPPING", "PAUSED"]:
+            if self.status not in ["STOPPING", "PAUSED", "REMOVING"]:
                 self.set_status("WAITING")
                 self.shared.update(active_queue="")
                 self.dump_history(self.queues[active_queue.queue_id])
@@ -310,3 +315,7 @@ class Recoder:
                         self.dump_queues()
                     else:
                         exit(0)
+
+                case "REMOVING":
+                    # Just sleep, should be handled all by the remove_queue function
+                    sleep(1)
