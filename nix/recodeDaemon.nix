@@ -14,9 +14,6 @@ python313Packages.buildPythonPackage rec {
 
   propagatedBuildInputs = with python313Packages; [
     python-daemon
-  ];
-
-  nativeBuildInputs = [
     ffmpeg
   ];
 

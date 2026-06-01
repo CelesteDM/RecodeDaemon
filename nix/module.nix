@@ -22,6 +22,11 @@ in
         type = lib.types.bool;
       };
     };
+
+    package = mkOption {
+      type = lib.types.package;
+      default = pkgs.callPackage ./recodeDaemon.nix {};
+    };
   };
 
   config = mkIf cfg.enable {
@@ -29,36 +34,34 @@ in
     systemd = let
       service = {
         description = "Recoding daemon for media services";
-        unitConfig = {
-          execStart = ''
-            ${pkgs.recodeDaemon}/bin/recoder \
-              -p ${toString cfg.port} \
+        serviceConfig = {
+          ExecStart = ''
+            ${cfg.package}/bin/recoder \
+              -p ${toString cfg.daemon.port} \
               daemon run
           '';
         };
         preStop = ''
-          ${pkgs.recodeDaemon}/bin/recoder \
-            -p ${toString cfg.port} \
+          ${cfg.package}/bin/recoder \
+            -p ${toString cfg.daemon.port} \
             daemon stop
         '';
         wantedBy =
-          if cfg.systemService
+          if cfg.daemon.systemService
           then ["multi-user.target"]
           else ["default.target"];
       };
     in
       lib.mkMerge [
-        (mkIf cfg.daemon.enable (mkIf (cfg.systemService) {
+        (mkIf cfg.daemon.enable (mkIf (cfg.daemon.systemService) {
           services.recodeDaemon = service;
         }))
 
-        (mkIf cfg.daemon.enable (mkIf (!cfg.systemService) {
+        (mkIf cfg.daemon.enable (mkIf (!cfg.daemon.systemService) {
           user.services.recodeDaemon = service;
         }))
-        
-        {
-          environment.systemPackages = [ pkgs.recodeDaemon ];
-        }
       ];
+
+    environment.systemPackages = [ cfg.package ];
   };
 }

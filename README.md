@@ -58,7 +58,7 @@ If you are using `specialArgs = { inherit inputs; };` as shown above, you can th
     daemon = {
       enable = true;
       port = 5300;
-      systemService = False;
+      systemService = false;
     };
   };
 }
