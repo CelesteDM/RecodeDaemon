@@ -53,6 +53,7 @@ class Queue:
                     "path": file.path,
                     "name": file.name,
                     "size": file.stat().st_size,
+                    "error": "",
                         }
             self.item_count = len(self.queue)
             self.status = "WAITING"
@@ -99,8 +100,8 @@ class Queue:
 
     def get_process(self, file_path: str, output_path: str) -> subprocess.Popen:
 
-        cmd_root = ["ffmpeg", "-v", "error", "-stats", "-nostdin", "-y", "-i", file_path, "-map", "0:v"]
-        cmd_audio_mapping, cmd_subtitles_mapping = ["-map", "0:a"], ["-map", "0:s"]
+        cmd_root = ["ffmpeg", "-v", "error", "-stats", "-nostdin", "-y", "-i", file_path, "-map", "0:v:?"]
+        cmd_audio_mapping, cmd_subtitles_mapping = ["-map", "0:a:?"], ["-map", "0:s:?"]
         cmd_video_settings = ["-c:v", "libx265", "-preset", self.queue_preset, "-x265-params", "log-level=none"]
         cmd_audio_settings = ["-c:a", "aac", "-b:a", "192k", "-ac", "2"]
         cmd_tail = ["-disposition:s:0", "default", "-disposition:s:1", "0", "-c:s", "copy", "-c:t", "copy"]
@@ -261,4 +262,5 @@ class Queue:
                 "path": snapshot["items"][index]["path"],
                 "name": snapshot["items"][index]["name"],
                 "size": snapshot["items"][index]["size"],
+                "error": snapshot["items"][index]["error"],
                 }

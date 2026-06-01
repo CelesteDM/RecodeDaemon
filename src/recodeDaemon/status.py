@@ -132,6 +132,9 @@ def list_queues(args):
             item = queue["items"][item_num]
             print(f"Name: {item['name']} | Status: {item['status']} | size: {format_size(item['size'])}")
             print(f"Full path: {item['path']}")
+            if item["error"]:
+                print()
+                print(f"Error log: \n{item['error']}")
             print()
 
         print("Queue config:")
