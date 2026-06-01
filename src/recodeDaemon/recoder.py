@@ -42,7 +42,7 @@ class Recoder:
             try:
                 os.makedirs(self.state_dir)
             except PermissionError:
-                sys.stderr.write(f"Could not create state direnctory. PermissionError\nos.makedirs({self.state_dir}): Permission Denied.\n")
+                sys.stderr.write(f"Could not create state directory. PermissionError\nos.makedirs({self.state_dir}): Permission Denied.\n")
                 exit(1)
 
         elif not os.access(self.state_dir, os.R_OK) or not os.access(self.state_dir, os.W_OK):

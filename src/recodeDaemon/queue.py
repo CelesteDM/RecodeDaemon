@@ -25,6 +25,14 @@ class Queue:
         self.next_item = 1
         self.items_done = 0
 
+    def mkdir(self, path) -> int:
+        if os.access(path, os.F_OK):
+            return 0
+        try:
+            os.makedirs(path)
+        except PermissionError:
+            return 1
+
     def populate(self) -> None:
         for path in self.queue_path:
             scan = os.scandir(path)
@@ -152,6 +160,12 @@ class Queue:
         else:
 
             if self.backup_path:
+                return_code = self.mkdir(self.backup_path)
+                if return_code != 0:
+                    current_item["status"] = "FAILED"
+                    current_item["error"] = "Could not create backup directory. PermissionError\nos.makedirs({self.backup_path}): Permission Denied.\n"
+                    current_item["exit_code"] = -1
+                    self.items_done += 1
                 backup_path = os.path.join(self.backup_path, current_item['name'])
                 if not os.path.exists(backup_path):
                     copy(current_item['path'], backup_path)
@@ -213,7 +227,14 @@ class Queue:
             # Steps after recoding depending on item status:
             if proc.returncode == 0:
                 if self.output_path:
-                    os.replace(temp_path, os.path.join(self.output_path, current_item["name"]))
+                    return_code = self.mkdir(self.output_path)
+                    if return_code != 0:
+                        current_item["status"] = "FAILED"
+                        current_item["error"] = "Could not create output directory. PermissionError\nos.makedirs({self.output_path}): Permission Denied.\nRecoded file is still located in {temp_path}, manual intervention is required.\n"
+                        current_item["exit_code"] = -1
+                        self.items_done += 1
+                    else:
+                        os.replace(temp_path, os.path.join(self.output_path, current_item["name"]))
                 else:
                     os.replace(temp_path, current_item["path"])
                 current_item["status"] = "SUCCESS"
