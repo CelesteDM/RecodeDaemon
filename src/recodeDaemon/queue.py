@@ -7,12 +7,12 @@ from .sharedState import SharedState
 
 class Queue:
 
-    status = "INIT"
-    queue = {}
-
     # Queues need to be able to be initiated without values so they can be later restored using the restore() function
     def __init__(self, shared: SharedState, queue_id="", queue_path=[], queue_preset="", is_animation=False, recursive=False, backup_path="", output_path="") -> None:
         self.shared = shared
+
+        self.status = "INIT"
+        self.queue = {}
 
         self.queue_id = queue_id
         self.queue_path = queue_path

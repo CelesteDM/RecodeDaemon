@@ -145,8 +145,8 @@ class Recoder:
                     response = {"status": "error",
                                 "error": "unknown command"}
 
-        # except Exception as e:
-        #     response = {"status": "error", "error": str(e)}
+        except Exception as e:
+            response = {"status": "error", "error": str(e)}
         finally:
             data = json.dumps(response)
             self.skt_send(conn, data)
@@ -171,7 +171,6 @@ class Recoder:
         self.set_status("WAITING")
 
         return {"status": "done"}
-            
 
     def list_queues(self, completed: bool, all: bool):
         queues = self.shared.snapshot()["queues"]
@@ -260,7 +259,6 @@ class Recoder:
                             self.set_status("RECODING")
 
                         case "RECODING":
-                            # print(f"DEBUG: Ammount of workers: {self.shared.workers_len()}")
                             current_snapshot = active_queue.snapshot()
                             if last_snapshot:
                                 if last_snapshot != current_snapshot:
@@ -284,38 +282,27 @@ class Recoder:
             match self.status:
                 case "IDLE":
                     if self.queues:
-                        # print("DEBUG: IDLE loop, about to change to WAITING")
                         self.set_status("WAITING")
                     else:
                         sleep(3)
 
                 case "PAUSED":
-                    # print("DEBUG: PAUSED loop interaction")
                     self.dump_queues()
                     sleep(1)
 
                 case "WAITING":
                     if not self.queues:
-                        # print("DEBUG: WAITING loop, about to change to IDLE")
                         self.set_status("IDLE")
                     else:
                         self.dump_queues()
                         self.run_queues()
 
                 case "STOPPING":
-                    # print(f"DEBUG: Ammount of threads: {len(threading.enumerate())}")
-                    # print(f"DEBUG: Ammount of workers: {self.shared.workers_len()}")
-                    # print()
                     while len(threading.enumerate()) != 1 or self.shared.workers_len() != 0:
                         sleep(1)
-                        # print(f"DEBUG: Is the worker alive? {self.active_worker.is_alive()}")
-                        # print(f"DEBUG: Ammount of threads: {len(threading.enumerate())}")
-                        # print(f"DEBUG: Ammount of workers: {self.shared.workers_len()}")
-                        # print(f"DEBUG: SharedState status: {self.shared.snapshot()['status']}")
                         self.dump_queues()
                     else:
                         exit(0)
 
                 case "REMOVING":
-                    # Just sleep, should be handled all by the remove_queue function
-                    sleep(1)
+                    sleep(1) # Just sleep, should be handled all by the remove_queue function

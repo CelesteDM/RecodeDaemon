@@ -14,6 +14,13 @@ def update_term_size(sig_num=None, stack_frame=None) -> None:
     TERM_WIDTH = width
     print_status()
 
+def format_size(bytes_: int) -> str:
+    units = ["B", "KB", "MB", "GB", "TB"]
+    for unit in units:
+        if bytes_ < 1000 or unit == units[-1]:
+            return f"{bytes_:.2f}{unit}"
+        bytes_ /= 1000
+
 def print_status(message={}) -> None:
     global TERM_WIDTH, PREV_ANSWER
     width = TERM_WIDTH
@@ -30,30 +37,41 @@ def print_status(message={}) -> None:
     print("├" + "─"*(width-2) + "┤")
     
     # Body
-    spacing = int((width-2)/5)
-    diff = width - ((spacing*5)+2)
-    columns = "│" + "{:^{spacing}}"*5 + " "*diff + "│"
+    v = ["ID", "STATUS", "ITEMS DONE", "SIZE"]
+    spacing = int((width-2)/len(v))
+    diff = width - ((spacing*len(v))+2)
 
-    v = ["ID", "STATUS", "ITEMS", "REMAINING", "FINISHED"]
-    print(columns.format(v[0], v[1], v[2], v[3], v[4], spacing=spacing))
+    columns = "│" + "{:^{s}.{s}}"*len(v) + " "*diff + "│"
+
+    print(columns.format(*v, s=spacing))
     print("├" + "┄"*(width-2) + "┤")
 
     # Per queue values
+    indx, q_amm = 0, len(message["queues"])
     for queue_id in message["queues"]:
         queue = message["queues"][queue_id]
-        v = [queue["queue_id"], queue["status"].lower(), queue["item_count"], queue["items_remaining"], queue["items_done"]]
-        print(columns.format(v[0], v[1], v[2], v[3], v[4], spacing=spacing))
+
+        queue_size = 0
+        for item_id in iter(queue["items"]):
+            queue_size += queue["items"][item_id]["size"]
+
+        v = [queue["queue_id"], queue["status"].lower(), f"{queue['items_done']}/{queue['item_count']}", format_size(queue_size)]
+        print(columns.format(*v, s=spacing))
 
         # Active queue files
         if queue["queue_id"] == message["active_queue"]:
 
-            line = "│" + "{:^{spacing}}"*5 + " "*diff + "│"
+            line = "│" + "{:^{s}.{s}}"*len(v) + " "*diff + "│"
 
             for item_id in iter(queue["items"]):
                 item = queue["items"][item_id]
+                v = ["•", item["status"].lower(), item["name"], format_size(item['size'])]
+                if len(v[2]) > spacing:
+                    v[2] = v[2][:spacing-1] + "…"
+                print(line.format(*v, s=spacing))
 
-                char = "└" if int(item_id) == len(queue["items"]) else "├"
-                print(line.format(char, item["status"].lower(), item["name"], f"Size: {item["size"]//(1024**2)}M", "", spacing=spacing))
+            if q_amm > 1:
+                print("├" + "┈"*(width-2) + "┤")
 
     print("└" + "─"*(width-2) + "┘")
 
@@ -94,6 +112,10 @@ def list_queues(args):
     for queue_id in answer["queues"]:
         queue = answer["queues"][queue_id]
 
+        queue_size = 0
+        for item_id in iter(queue["items"]):
+            queue_size += queue["items"][item_id]["size"]
+
         if i:
             print("\n\n\n")
         else:
@@ -101,13 +123,14 @@ def list_queues(args):
 
         print(f"Queue ID: {queue_id}")
         print(f"Status: {queue['status']}")
+        print(f"Queue size: {format_size(queue_size)}")
 
         print()
         print(f"Items Done: {queue['items_done']}/{queue['item_count']}")
 
         for item_num in queue["items"]:
             item = queue["items"][item_num]
-            print(f"Name: {item['name']} | Status: {item['status']} | size: {item['size']//(1024**2)}M")
+            print(f"Name: {item['name']} | Status: {item['status']} | size: {format_size(item['size'])}")
             print(f"Full path: {item['path']}")
             print()
 
