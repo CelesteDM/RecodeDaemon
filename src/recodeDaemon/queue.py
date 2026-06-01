@@ -108,7 +108,7 @@ class Queue:
 
     def get_process(self, file_path: str, output_path: str) -> subprocess.Popen:
 
-        cmd_root = ["ffmpeg", "-v", "error", "-stats", "-nostdin", "-y", "-i", file_path, "-map", "0:v:?"]
+        cmd_root = ["ffmpeg", "-v", "error", "-nostdin", "-y", "-i", file_path, "-map", "0:v:?"]
         cmd_audio_mapping, cmd_subtitles_mapping = ["-map", "0:a:?"], ["-map", "0:s:?"]
         cmd_video_settings = ["-c:v", "libx265", "-preset", self.queue_preset, "-x265-params", "log-level=none"]
         cmd_audio_settings = ["-c:a", "aac", "-b:a", "192k", "-ac", "2"]
@@ -163,7 +163,7 @@ class Queue:
                 return_code = self.mkdir(self.backup_path)
                 if return_code != 0:
                     current_item["status"] = "FAILED"
-                    current_item["error"] = "Could not create backup directory. PermissionError\nos.makedirs({self.backup_path}): Permission Denied.\n"
+                    current_item["error"] = f"Could not create backup directory. PermissionError\nos.makedirs({self.backup_path}): Permission Denied.\n"
                     current_item["exit_code"] = -1
                     self.items_done += 1
                 backup_path = os.path.join(self.backup_path, current_item['name'])
@@ -171,6 +171,8 @@ class Queue:
                     copy(current_item['path'], backup_path)
 
             temp_path = os.path.join(os.path.dirname(current_item["path"]), f"RECODE_{current_item['name']}")
+            if temp_path[-4:] == ".mp4":
+                temp_path = temp_path[:-4] + ".mkv"
             proc = self.get_process(current_item["path"], temp_path)
             self.shared.append_worker(proc)
 
@@ -230,10 +232,14 @@ class Queue:
                     return_code = self.mkdir(self.output_path)
                     if return_code != 0:
                         current_item["status"] = "FAILED"
-                        current_item["error"] = "Could not create output directory. PermissionError\nos.makedirs({self.output_path}): Permission Denied.\nRecoded file is still located in {temp_path}, manual intervention is required.\n"
+                        current_item["error"] = f"Could not create output directory. PermissionError\nos.makedirs({self.output_path}): Permission Denied.\nRecoded file is still located in {temp_path}, manual intervention is required.\n"
                         current_item["exit_code"] = -1
                         self.items_done += 1
                     else:
+                        if current_item["name"][-4:] == ".mp4":
+                            output_name = current_item["name"][:-4] + ".mkv"
+                        else:
+                            current_item = current_item["name"]
                         os.replace(temp_path, os.path.join(self.output_path, current_item["name"]))
                 else:
                     os.replace(temp_path, current_item["path"])
