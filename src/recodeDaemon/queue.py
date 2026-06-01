@@ -219,7 +219,10 @@ class Queue:
                 self.items_done += 1
 
             elif current_item["status"] != "INTERRUPTED":
-                os.remove(temp_path)
+                try:
+                    os.remove(temp_path)
+                except FileNotFoundError:
+                    pass
                 current_item["status"] = "FAILED"
                 current_item["error"] = proc.communicate()[1]
                 current_item["exit_code"] = proc.returncode
