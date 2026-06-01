@@ -205,7 +205,7 @@ class Recoder:
         return queue_id
 
     def dump_history(self, queue) -> None:
-        with open(self.history_path, 'wb') as history_file:
+        with open(self.history_path, 'ab') as history_file:
             pickle.dump(queue.snapshot(), history_file)
 
     def set_status(self, status: str) -> None:

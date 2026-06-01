@@ -26,12 +26,12 @@ class Queue:
         self.items_done = 0
 
     def mkdir(self, path) -> int:
-        if os.access(path, os.F_OK):
-            return 0
-        try:
-            os.makedirs(path)
-        except PermissionError:
-            return 1
+        if not os.access(path, os.F_OK):
+            try:
+                os.makedirs(path)
+            except PermissionError:
+                return 1
+        return 0
 
     def populate(self) -> None:
         for path in self.queue_path:
@@ -160,8 +160,7 @@ class Queue:
         else:
 
             if self.backup_path:
-                return_code = self.mkdir(self.backup_path)
-                if return_code != 0:
+                if self.mkdir(self.backup_path) != 0:
                     current_item["status"] = "FAILED"
                     current_item["error"] = f"Could not create backup directory. PermissionError\nos.makedirs({self.backup_path}): Permission Denied.\n"
                     current_item["exit_code"] = -1
