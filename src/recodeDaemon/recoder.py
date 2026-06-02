@@ -209,9 +209,7 @@ class Recoder:
         # Helper function for the create_queue() function
         # Runs Queue.populate() and then updates the sharedState
         # Its meant to be run in parallel so the create_queue() function is not stuck without returning the status
-
         queue.populate()
-        self.queues[queue.queue_id] = queue
         self.dump_queues()
 
     def create_queue(self, path: list, name: str, preset: str, animation: bool, recursive: bool, backup_path: str, output_path: str) -> dict:
@@ -231,8 +229,11 @@ class Recoder:
                 break
 
         new_queue = Queue(self.shared, queue_id, name, path, preset, animation, recursive, backup_path, output_path)
+        self.queues[queue_id] = new_queue
+        self.dump_queues()
+
         threading.Thread(target=self.populate_queue, args=[new_queue], daemon=True).start()
-        # self.populate_queue(new_queue)
+
         return {"status": "done", "queue_id": queue_id}
 
     def dump_history(self, queue) -> None:

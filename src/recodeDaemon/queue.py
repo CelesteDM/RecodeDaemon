@@ -13,7 +13,7 @@ class Queue:
         self.queue = {}
 
         self.queue_id = queue_id
-        self.queue_name = queue_name
+        self.queue_name = queue_name if queue_name else self.generate_name(queue_path[0])
 
         self.queue_path = queue_path
         self.queue_preset = queue_preset
@@ -22,7 +22,6 @@ class Queue:
         self.backup_path = backup_path
         self.output_path = output_path
 
-        self.next_item = 1
         self.items_done = 0
 
     def mkdir(self, path) -> int:
@@ -43,9 +42,6 @@ class Queue:
         return " ".join(words)
 
     def populate(self) -> None:
-        if not self.queue_name:
-            self.queue_name = self.generate_name(self.queue_path[0])
-
         for path in self.queue_path:
             scan = os.scandir(path)
             dirs = []
@@ -290,40 +286,45 @@ class Queue:
             self.items_done += 1
 
     def snapshot(self) -> dict:
-        return {
+        status = {
             "queue_id": self.queue_id,
             "queue_name": self.queue_name,
             "status": self.status,
-            "item_count": self.item_count,
-            "items_done": self.items_done,
-            "items_remaining": self.item_count - self.items_done,
-            "items": self.queue,
             "config": {
                 "preset": self.queue_preset,
                 "is_animation": self.is_animation,
                 "backup_path": self.backup_path,
-                "output_path": self.output_path,
-            },
-        }
+                "output_path": self.output_path}}
+
+        if self.status == "INIT":
+            return status
+        else:
+            items = {
+                "item_count": self.item_count,
+                "items_done": self.items_done,
+                "items_remaining": self.item_count - self.items_done,
+                "items": self.queue}
+            return status | items
 
     def restore(self, snapshot: dict):
         self.queue_id = snapshot["queue_id"]
         self.queue_name = snapshot["queue_name"]
         self.status = snapshot["status"]
-        self.item_count = snapshot["item_count"]
-        self.items_done = snapshot["items_done"]
         self.queue_preset = snapshot["config"]["preset"]
         self.is_animation = snapshot["config"]["is_animation"]
         self.backup_path = snapshot["config"]["backup_path"]
         self.output_path = snapshot["config"]["output_path"]
-        for index in snapshot["items"]:
-            self.queue[index] = {
-                "status": snapshot["items"][index]["status"],
-                "path": snapshot["items"][index]["path"],
-                "name": snapshot["items"][index]["name"],
-                "size": snapshot["items"][index]["size"],
-                "error": snapshot["items"][index]["error"],
-                "exit_code": snapshot["items"][index]["exit_code"],
-                "frame_count": snapshot["items"][index]["frame_count"],
-                "progress": snapshot["items"][index]["progress"],
-                }
+
+        if snapshot["status"] != "INIT":
+            self.item_count = snapshot["item_count"]
+            self.items_done = snapshot["items_done"]
+            for index in snapshot["items"]:
+                self.queue[index] = {
+                    "status": snapshot["items"][index]["status"],
+                    "path": snapshot["items"][index]["path"],
+                    "name": snapshot["items"][index]["name"],
+                    "size": snapshot["items"][index]["size"],
+                    "error": snapshot["items"][index]["error"],
+                    "exit_code": snapshot["items"][index]["exit_code"],
+                    "frame_count": snapshot["items"][index]["frame_count"],
+                    "progress": snapshot["items"][index]["progress"]}

@@ -54,15 +54,18 @@ def print_status(message={}) -> None:
         if queue["queue_id"] == message["active_queue"] and indx > 1:
             print("├" + "┈"*(width-2) + "┤")
 
-        queue_size = 0
-        for item_id in iter(queue["items"]):
-            queue_size += queue["items"][item_id]["size"]
+        queue_size, item_counter = 0, "0/0"
+        if queue["status"] != "INIT":
+            for item_id in iter(queue["items"]):
+                queue_size += queue["items"][item_id]["size"]
 
-        v = [str(queue["queue_id"]), queue["queue_name"], queue["status"].lower(), f"{queue['items_done']}/{queue['item_count']}", format_size(queue_size)]
+            item_counter = f"{queue['items_done']}/{queue['item_count']}"
+
+        v = [str(queue["queue_id"]), queue["queue_name"], queue["status"].lower(), item_counter, format_size(queue_size)]
         print(columns.format(*v, s=spacing))
 
         # Active queue files
-        if queue["queue_id"] == message["active_queue"]:
+        if queue["queue_id"] == message["active_queue"] and queue["status"] != "INIT":
 
             for item_id in iter(queue["items"]):
                 item = queue["items"][item_id]
