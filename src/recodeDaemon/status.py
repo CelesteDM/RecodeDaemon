@@ -66,7 +66,8 @@ def print_status(message={}) -> None:
 
             for item_id in iter(queue["items"]):
                 item = queue["items"][item_id]
-                item_progress = round(100 / item["frame_count"] * item["progress"])
+                item_progress = round(100 / item["frame_count"] * item["progress"], 1)
+                item_progress = int(item_progress) if item_progress % 1 == 0 else item_progress
 
                 v = ["• ", item["name"], item["status"].lower(), f"{item_progress}%", format_size(item['size'])]
 
