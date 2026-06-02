@@ -119,6 +119,7 @@ Delete one or more queues:
 ```
 recoder queue delete <queue-ids>
 ```
+The keyword `active` can be used along other ids as a valid queue-id to delete the current active queue.
 
 List queues:
 ```
