@@ -106,7 +106,7 @@ class Recoder:
                 case "queue":
                     match request["action"]:
                         case "create":
-                            queue_id = self.create_queue(
+                            response = self.create_queue(
                                 request["path"],
                                 request["name"],
                                 request["preset"],
@@ -114,8 +114,6 @@ class Recoder:
                                 request["recursive"],
                                 request["backup_path"],
                                 request["output_path"])
-                            response = {"status": "done",
-                                        "queue_id": queue_id}
 
                         case "list":
                             response = self.list_queues(
@@ -207,8 +205,16 @@ class Recoder:
         else:
             return {"status": "done", "queues": waiting | history}
 
+    def populate_queue(self, queue: Queue) -> None:
+        # Helper function for the create_queue() function
+        # Runs Queue.populate() and then updates the sharedState
+        # Its meant to be run in parallel so the create_queue() function is not stuck without returning the status
 
-    def create_queue(self, path: list, name: str, preset: str, animation: bool, recursive: bool, backup_path: str, output_path: str) -> int:
+        queue.populate()
+        self.queues[queue.queue_id] = queue
+        self.dump_queues()
+
+    def create_queue(self, path: list, name: str, preset: str, animation: bool, recursive: bool, backup_path: str, output_path: str) -> dict:
         queue_id = ''.join(choice(ascii_lowercase) for _ in range(6))
         while queue_id in self.queues:
             queue_id = ''.join(choice(ascii_lowercase) for _ in range(6))
@@ -225,11 +231,9 @@ class Recoder:
                 break
 
         new_queue = Queue(self.shared, queue_id, name, path, preset, animation, recursive, backup_path, output_path)
-        new_queue.populate()
-        self.queues[queue_id] = new_queue
-        self.dump_queues()
-
-        return queue_id
+        threading.Thread(target=self.populate_queue, args=[new_queue], daemon=True).start()
+        # self.populate_queue(new_queue)
+        return {"status": "done", "queue_id": queue_id}
 
     def dump_history(self, queue) -> None:
         with open(self.history_path, 'ab') as history_file:
@@ -266,7 +270,7 @@ class Recoder:
     def run_queues(self) -> None:
         active_queue = ""
         for queue_id in self.queues:
-            if self.queues[queue_id].snapshot()["status"] not in ["SUCCESS", "FAILED", "WARNING"]:
+            if self.queues[queue_id].snapshot()["status"] not in ["INIT", "SUCCESS", "FAILED", "WARNING"]:
                 active_queue = self.queues[queue_id]
                 self.shared.update(active_queue=active_queue.queue_id)
                 break
