@@ -9,13 +9,18 @@ def main() -> None:
     args = parse_args()
 
     if args["cmd"] == "daemon" and args["action"] == "run":
-        shared = SharedState(args["state"])
+        shared = SharedState(normalize_path(args["state"]))
         if args["daemon"]:
             with DaemonContext():
                 print("status: done")
                 Recoder(shared, args["port"]).run()
         else:
-            Recoder(shared, args["port"]).run()
+            recoder = Recoder(shared, args["port"])
+            try:
+                recoder.run()
+            except KeyboardInterrupt:
+                recoder.terminate()
+                exit(0)
 
     elif args["cmd"] == "status":
         if args["raw"]:
@@ -37,6 +42,13 @@ def main() -> None:
             exit(0)
 
     else:
+        # Normalize paths
+        # Needs to be done here to ensure relative paths are handled correctly
+        if args["cmd"] == "queue" and args["action"] == "create":
+            args["backup_path"] = normalize_path(args["backup_path"])
+            args["output_path"] = normalize_path(args["output_path"])
+            args["path"] = [normalize_path(p) for p in args["path"]]
+
         conn = skt_connect(args["port"])
         if not conn:
             print("Socket not responding, is the daemon running?")
@@ -49,5 +61,3 @@ def main() -> None:
 
         if answer["status"] == "error":
             exit(1)
-        else:
-            exit(0)

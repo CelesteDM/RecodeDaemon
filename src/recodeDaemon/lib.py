@@ -1,8 +1,9 @@
 import socket
 import json
 from struct import unpack, pack
+import os.path
 
-def skt_connect(port):
+def skt_connect(port: int):
     conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         conn.connect(("127.0.0.1", port))
@@ -10,7 +11,7 @@ def skt_connect(port):
         return None
     return conn
 
-def skt_communicate(conn, message) -> dict:
+def skt_communicate(conn: socket.socket, message: str) -> dict:
     data = message.encode()
     conn.sendall(pack('>I', len(data)))
     conn.sendall(data)
@@ -25,3 +26,17 @@ def skt_communicate(conn, message) -> dict:
 
     conn.close()
     return json.loads(response.decode())
+
+def normalize_path(path: str) -> str:
+    # 1. Expand variables
+    # 2. Expand user home
+    # 3. Convert to absolute
+    # 4. Simplify redundant parts
+    if path:
+        path = os.path.expandvars(path)
+        path = os.path.expanduser(path)
+        if not os.path.isabs(path):
+            path = os.path.abspath(path)
+        path = os.path.normpath(path)
+    return path
+

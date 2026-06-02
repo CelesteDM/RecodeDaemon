@@ -70,8 +70,8 @@ class Queue:
                             files.append(obj)
                     dirs.remove(dirs[0])
 
-            for index, file in enumerate(files):
-                self.queue[index+1] = {
+            for file in files:
+                self.queue[len(self.queue)+1] = {
                     "status": "WAITING",
                     "path": file.path,
                     "name": file.name,
@@ -81,8 +81,9 @@ class Queue:
                     "frame_count": self.get_frame_count(file.path),
                     "progress": 0,
                         }
-            self.item_count = len(self.queue)
-            self.status = "WAITING"
+
+        self.item_count = len(self.queue)
+        self.status = "WAITING"
 
     def get_frame_count(self, path) -> int:
         return int(subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", path], capture_output=True, shell=False, text=True).stdout)
