@@ -146,5 +146,4 @@ def list_queues(args):
         print(f"Animation: {queue['config']['is_animation']}")
         print(f"Preset: {queue['config']['preset']}")
         print(f"Backup path: {queue['config']['backup_path']}")
-
-
+        print(f"Ouput path: {queue['config']['output_path']}")
