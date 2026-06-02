@@ -12,10 +12,10 @@ from random import choice
 from .sharedState import SharedState
 
 class Recoder:
-    queues: dict[str, Queue] = {}
-    status = ""
+    queues: dict[int, Queue] = {}
+    status: str = ""
     active_worker = None
-    active_queue = None
+    active_queue: int
 
     def __init__(self, shared: SharedState, skt_port: int) -> None:
         self.shared = shared
@@ -105,6 +105,7 @@ class Recoder:
                         case "create":
                             queue_id = self.create_queue(
                                 request["path"],
+                                request["name"],
                                 request["preset"],
                                 request["animation"],
                                 request["recursive"],
@@ -151,37 +152,48 @@ class Recoder:
             data = json.dumps(response)
             self.skt_send(conn, data)
 
-    def remove_queue(self, queue_ids: list):
+    def remove_queue(self, queue_ids: list[str]) -> dict:
         existing_ids = list(self.queues)
+        active_queue = self.shared.snapshot()["active_queue"]
 
-        for q_id in queue_ids:
-            if q_id not in existing_ids:
+        for i in range(len(queue_ids)):
+            if queue_ids[i] == "active":
+                if str(active_queue) not in queue_ids:
+                    queue_ids[i] = str(active_queue)
+
+            elif int(queue_ids[i]) not in existing_ids:
                 return {"status": "error",
                         "error": "queue not found",
-                        "queue_id": q_id}
+                        "queue_id": queue_ids[i]}
+
+        if "active" in queue_ids:
+            queue_ids.remove("active")
 
         for q_id in queue_ids:
-            if q_id == self.shared.snapshot()["active_queue"]:
+
+            # Active queue deletion pre-delete
+            if int(q_id) == active_queue:
                 self.set_status("REMOVING")
                 while self.shared.workers_len() != 0:
                     sleep(1)
-            del self.queues[q_id]
+
+            del self.queues[int(q_id)]
+
+            # Active queue deletion post-delete
+            if int(q_id) == active_queue:
+                self.set_status("WAITING")
+                self.shared.update(active_queue=None)
 
         self.dump_queues()
-        self.set_status("WAITING")
-        self.shared.update(active_queue="")
-
         return {"status": "done"}
 
-    def list_queues(self, completed: bool, all: bool):
+    def list_queues(self, completed: bool, all: bool) -> dict:
         queues = self.shared.snapshot()["queues"]
         waiting = {}
 
         history = self.shared.read_history()
         for queue_id in self.queues:
-            if queues[queue_id]["status"] in ["COMPLETED", "FAILED"]:
-                history[queue_id] = queues[queue_id]
-            else:
+            if queues[queue_id]["status"] not in ["COMPLETED", "FAILED"]:
                 waiting[queue_id] = queues[queue_id]
 
         if not all:
@@ -193,12 +205,23 @@ class Recoder:
             return {"status": "done", "queues": waiting | history}
 
 
-    def create_queue(self, path: list, preset: str, animation: bool, recursive: bool, backup_path: str, output_path: str) -> str:
+    def create_queue(self, path: list, name: str, preset: str, animation: bool, recursive: bool, backup_path: str, output_path: str) -> int:
         queue_id = ''.join(choice(ascii_lowercase) for _ in range(6))
         while queue_id in self.queues:
             queue_id = ''.join(choice(ascii_lowercase) for _ in range(6))
 
-        new_queue = Queue(self.shared, queue_id, path, preset, animation, recursive, backup_path, output_path)
+        ids = list(self.shared.read_history())
+        for queue_id in self.queues:
+            if self.queues[queue_id].snapshot()["status"] not in ["COMPLETED", "FAILED"]:
+                ids += [queue_id]
+
+        queue_id = len(ids)
+        for i in range(len(ids)):
+            if i not in ids:
+                queue_id = i
+                break
+
+        new_queue = Queue(self.shared, queue_id, name, path, preset, animation, recursive, backup_path, output_path)
         new_queue.populate()
         self.queues[queue_id] = new_queue
         self.dump_queues()
@@ -274,7 +297,7 @@ class Recoder:
 
             if self.status not in ["STOPPING", "PAUSED", "REMOVING"]:
                 self.set_status("WAITING")
-                self.shared.update(active_queue="")
+                self.shared.update(active_queue=None)
                 self.dump_history(self.queues[active_queue.queue_id])
                 # del self.queues[active_queue.queue_id]
                 self.dump_queues()
@@ -286,7 +309,7 @@ class Recoder:
                     if self.queues:
                         self.set_status("WAITING")
                     else:
-                        sleep(3)
+                        sleep(1)
 
                 case "PAUSED":
                     self.dump_queues()

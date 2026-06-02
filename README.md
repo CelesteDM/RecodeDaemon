@@ -103,6 +103,7 @@ Create a recoding queue:
 ```
 recoder queue create /path/to/files
 ```
+A name can be specified using the `-n / --name` flag, this is not required, and the daemon will try to create a name using the directory basename if a name is not provided.
 If no output options are specified, the files will be ovewritten in place, this can be changed using the `-o / --output` flag to specify an output directory, or the `-b / --backup` flag to specify a directory where the original files will be copied to.
 Both the preset velocity can be specified using its name with the `-p / --preset` flag.
 For a full list of presets, check [the h265 coding docs](https://x265.readthedocs.io/en/stable/presets.html#presets).

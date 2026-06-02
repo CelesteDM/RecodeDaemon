@@ -9,13 +9,15 @@ from sys import stdout
 class Queue:
 
     # Queues need to be able to be initiated without values so they can be later restored using the restore() function
-    def __init__(self, shared: SharedState, queue_id="", queue_path=[], queue_preset="", is_animation=False, recursive=False, backup_path="", output_path="") -> None:
+    def __init__(self, shared: SharedState, queue_id=-1, queue_name="", queue_path=[], queue_preset="", is_animation=False, recursive=False, backup_path="", output_path="") -> None:
         self.shared = shared
 
         self.status = "INIT"
         self.queue = {}
 
         self.queue_id = queue_id
+        self.queue_name = queue_name
+
         self.queue_path = queue_path
         self.queue_preset = queue_preset
         self.is_animation = is_animation
@@ -34,7 +36,19 @@ class Queue:
                 return 1
         return 0
 
+    def generate_name(self, path) -> str:
+        words = []
+        for word in os.path.basename(path).split():
+            if word[0].isalnum():
+                words.append(word)
+            else:
+                break
+        return " ".join(words)
+
     def populate(self) -> None:
+        if not self.queue_name:
+            self.queue_name = self.generate_name(self.queue_path[0])
+
         for path in self.queue_path:
             scan = os.scandir(path)
             dirs = []
@@ -273,6 +287,7 @@ class Queue:
     def snapshot(self) -> dict:
         return {
             "queue_id": self.queue_id,
+            "queue_name": self.queue_name,
             "status": self.status,
             "item_count": self.item_count,
             "items_done": self.items_done,
@@ -288,6 +303,7 @@ class Queue:
 
     def restore(self, snapshot: dict):
         self.queue_id = snapshot["queue_id"]
+        self.queue_name = snapshot["queue_name"]
         self.status = snapshot["status"]
         self.item_count = snapshot["item_count"]
         self.items_done = snapshot["items_done"]
@@ -302,4 +318,6 @@ class Queue:
                 "name": snapshot["items"][index]["name"],
                 "size": snapshot["items"][index]["size"],
                 "error": snapshot["items"][index]["error"],
+                "frame_count": snapshot["items"][index]["frame_count"],
+                "progress": snapshot["items"][index]["progress"],
                 }

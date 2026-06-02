@@ -27,7 +27,7 @@ def print_status(message={}) -> None:
     message = PREV_ANSWER if not message else message
     system("clear")
     active_queue = "None" if not message["active_queue"] else message["active_queue"]
-    var_len = len(message["status"]) + len(active_queue)
+    var_len = len(message["status"]) + len(str(active_queue))
 
     # Header
     print("┌" + "─"*(width-2) + "┐")
@@ -37,11 +37,11 @@ def print_status(message={}) -> None:
     print("├" + "─"*(width-2) + "┤")
     
     # Body
-    v = ["ID", "STATUS", "PROGRESS", "SIZE"]
-    spacing = int((width-2)/len(v))
-    diff = width - ((spacing*len(v))+2)
+    v = ["ID", "NAME", "STATUS", "PROGRESS", "SIZE"]
+    spacing = int((width-6)/(len(v)-1))
+    diff = width - (spacing * (len(v)-1) + 2 + 4) # 2 are the box characters, and 4 the ID column spacing
 
-    columns = "│" + "{:^{s}.{s}}"*len(v) + " "*diff + "│"
+    columns = "│" + "{:^4}" + "{:^{s}.{s}}"*(len(v)-1) + " "*diff + "│"
 
     print(columns.format(*v, s=spacing))
     print("├" + "┄"*(width-2) + "┤")
@@ -58,21 +58,21 @@ def print_status(message={}) -> None:
         for item_id in iter(queue["items"]):
             queue_size += queue["items"][item_id]["size"]
 
-        v = [queue["queue_id"], queue["status"].lower(), f"{queue['items_done']}/{queue['item_count']}", format_size(queue_size)]
+        v = [str(queue["queue_id"]), queue["queue_name"], queue["status"].lower(), f"{queue['items_done']}/{queue['item_count']}", format_size(queue_size)]
         print(columns.format(*v, s=spacing))
 
         # Active queue files
         if queue["queue_id"] == message["active_queue"]:
 
-            line = "│" + "{:^{s}.{s}}"*len(v) + " "*diff + "│"
-
             for item_id in iter(queue["items"]):
                 item = queue["items"][item_id]
                 item_progress = round(100 / item["frame_count"] * item["progress"])
-                v = ["• " + item["name"], item["status"].lower(), f"{item_progress}%", format_size(item['size'])]
+
+                v = ["• ", item["name"], item["status"].lower(), f"{item_progress}%", format_size(item['size'])]
+
                 if len(v[2]) > spacing:
                     v[2] = v[2][:spacing-1] + "…"
-                print(line.format(*v, s=spacing))
+                print(columns.format(*v, s=spacing))
 
             if q_amm > indx:
                 print("├" + "┈"*(width-2) + "┤")
@@ -126,6 +126,7 @@ def list_queues(args):
             i = True
 
         print(f"Queue ID: {queue_id}")
+        print(f"Queue name: {queue['queue_name']}")
         print(f"Status: {queue['status']}")
         print(f"Queue size: {format_size(queue_size)}")
 

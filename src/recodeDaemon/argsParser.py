@@ -49,6 +49,7 @@ def parse_args() -> dict:
     queue_create_parser = queue_subparsers.add_parser("create", description="Create recoding queues.", help="queue creation help")
     queue_create_parser.set_defaults(action="create")
     queue_create_parser.add_argument("path", action="extend", nargs="+", type=str, help="Path or paths to the file or directory to be recoded")
+    queue_create_parser.add_argument("-n", "--name", default="", help="Name of the queue, if empty, the directory acronym will be used.")
     queue_create_parser.add_argument("-r", "--recursive", action="store_true", help="Use recursive search on the specified directories paths")
     queue_create_parser.add_argument("-b", "--backup-path", default="", help="Directory path where backup of files will be stored, if left empty or unspecified the files will be overwritten without backup")
     queue_create_parser.add_argument("-o", "--output-path", default="", help="Directory path where recoded files will be stored, if left empty or unspecified the files will be overwritten in place")
