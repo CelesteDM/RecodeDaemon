@@ -35,6 +35,7 @@
     devShells = forAllSystems ({ pkgs }: let
       python = pkgs.python313.withPackages (ps: with ps; [
         python-daemon
+        psutil
       ]);
     in {
       default = pkgs.mkShell {

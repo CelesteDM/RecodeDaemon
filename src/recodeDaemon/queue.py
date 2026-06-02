@@ -1,10 +1,7 @@
-import os
-import subprocess
-import signal
+import os, subprocess, signal, psutil
 from time import sleep
 from shutil import copy
 from .sharedState import SharedState
-from sys import stdout
 
 class Queue:
 
@@ -194,7 +191,9 @@ class Queue:
             temp_path = os.path.join(os.path.dirname(current_item["path"]), f"RECODE_{current_item['name']}")
             if temp_path[-4:] == ".mp4":
                 temp_path = temp_path[:-4] + ".mkv"
+
             proc = self.get_process(current_item["path"], temp_path)
+            psutil.Process(proc.pid).nice(10)
             self.shared.append_worker(proc)
 
             while proc.poll() is None:

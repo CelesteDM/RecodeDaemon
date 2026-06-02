@@ -12,8 +12,9 @@ python313Packages.buildPythonPackage rec {
   pyproject = true;
   build-system = with python313Packages; [ setuptools ];
 
-  propagatedBuildInputs = with python313Packages; [
-    python-daemon
+  propagatedBuildInputs = [
+    python313Packages.python-daemon
+    python313Packages.psutil
     ffmpeg
   ];
 
