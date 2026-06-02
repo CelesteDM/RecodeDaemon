@@ -254,20 +254,27 @@ class Queue:
             # Steps after recoding depending on item status:
             if proc.returncode == 0:
                 if self.output_path:
+
+                    # Create output dir
                     return_code = self.mkdir(self.output_path)
                     if return_code != 0:
                         current_item["status"] = "FAILED"
                         current_item["error"] = f"Could not create output directory. PermissionError\nos.makedirs({self.output_path}): Permission Denied.\nRecoded file is still located in {temp_path}, manual intervention is required.\n"
                         current_item["exit_code"] = -1
                         self.items_done += 1
-                    else:
+
+                    else: # Move the temp path to the output path
                         if current_item["name"][-4:] == ".mp4":
                             output_name = current_item["name"][:-4] + ".mkv"
                         else:
                             output_name = current_item["name"]
                         os.replace(temp_path, os.path.join(self.output_path, output_name))
-                else:
+
+                else: # Move the temp path to the original path
                     os.replace(temp_path, current_item["path"])
+                    if current_item["path"][-4:] == ".mp4":
+                        os.replace(current_item["path"], current_item["path"][:-4] + ".mkv")
+
                 current_item["status"] = "SUCCESS"
                 current_item["progress"] = current_item["frame_count"]
                 self.items_done += 1
