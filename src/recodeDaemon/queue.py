@@ -170,9 +170,9 @@ class Queue:
 
     def run_next(self) -> None:
         current_item = None
-        for index in self.queue:
-            if self.queue[index]["status"] not in ["SUCCESS", "FAILED"]:
-                current_item = self.queue[index]
+        for item in self.queue:
+            if self.queue[item]["status"] not in ["SUCCESS", "FAILED"]:
+                current_item = self.queue[item]
                 break
         if not current_item:
             self.set_exit_status()
@@ -278,7 +278,7 @@ class Queue:
                 current_item["progress"] = current_item["frame_count"]
                 self.status = "WAITING"
 
-            else:
+            elif self.status != "STOPPING":
                 try:
                     os.remove(temp_path)
                 except FileNotFoundError:
