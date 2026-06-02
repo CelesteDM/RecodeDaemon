@@ -28,12 +28,15 @@ class Recoder:
         self.load_queues()
 
         # Socket init
-        self.socket.bind(("127.0.0.1", skt_port))
-        self.socket.listen()
-        threading.Thread(
-            target=self.skt_listen,
-            daemon=True
-        ).start()
+        try:
+            self.socket.bind(("127.0.0.1", skt_port))
+            self.socket.listen()
+            threading.Thread(
+                target=self.skt_listen,
+                daemon=True
+            ).start()
+        except OSError:
+            sys.stderr.write(f"ERROR: Port address {skt_port} already in use.")
 
         self.set_status("IDLE")
 
@@ -42,11 +45,11 @@ class Recoder:
             try:
                 os.makedirs(self.state_dir)
             except PermissionError:
-                sys.stderr.write(f"Could not create state directory. PermissionError\nos.makedirs({self.state_dir}): Permission Denied.\n")
+                sys.stderr.write(f"ERROR: Could not create state directory. PermissionError\nos.makedirs({self.state_dir}): Permission Denied.\n")
                 exit(1)
 
         elif not os.access(self.state_dir, os.R_OK) or not os.access(self.state_dir, os.W_OK):
-            sys.stderr.write(f"Could not open state directory. PermissionError\n{self.state_dir}: Permission Denied.\n")
+            sys.stderr.write(f"ERROR: Could not open state directory. PermissionError\n{self.state_dir}: Permission Denied.\n")
             exit(1)
 
     def terminate(self) -> None:
