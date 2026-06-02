@@ -169,6 +169,7 @@ class Recoder:
 
         self.dump_queues()
         self.set_status("WAITING")
+        self.shared.update(active_queue="")
 
         return {"status": "done"}
 
@@ -217,7 +218,8 @@ class Recoder:
         with open(self.queues_path, 'wb') as queue_file:
             for item in self.queues:
                 snapshot[item] = self.queues[item].snapshot()
-                pickle.dump(snapshot[item], queue_file)
+                if snapshot[item]["status"] not in ["SUCCESS", "FAILED", "WARNING"]:
+                    pickle.dump(snapshot[item], queue_file)
         self.shared.update(queues=snapshot)
 
     def load_queues(self) -> None:
@@ -238,7 +240,7 @@ class Recoder:
     def run_queues(self) -> None:
         active_queue = ""
         for queue_id in self.queues:
-            if self.queues[queue_id] not in ["SUCCESS", "FAILED", "WARNING"]:
+            if self.queues[queue_id].snapshot()["status"] not in ["SUCCESS", "FAILED", "WARNING"]:
                 active_queue = self.queues[queue_id]
                 self.shared.update(active_queue=active_queue.queue_id)
                 break
@@ -274,7 +276,7 @@ class Recoder:
                 self.set_status("WAITING")
                 self.shared.update(active_queue="")
                 self.dump_history(self.queues[active_queue.queue_id])
-                del self.queues[active_queue.queue_id]
+                # del self.queues[active_queue.queue_id]
                 self.dump_queues()
 
     def run(self) -> None:

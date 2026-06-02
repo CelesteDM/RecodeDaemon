@@ -4,6 +4,7 @@ import signal
 from time import sleep
 from shutil import copy
 from .sharedState import SharedState
+from sys import stdout
 
 class Queue:
 
@@ -62,9 +63,14 @@ class Queue:
                     "name": file.name,
                     "size": file.stat().st_size,
                     "error": "",
+                    "frame_count": self.get_frame_count(file.path),
+                    "progress": 0,
                         }
             self.item_count = len(self.queue)
             self.status = "WAITING"
+
+    def get_frame_count(self, path) -> int:
+        return int(subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", path], capture_output=True, shell=False, text=True).stdout)
 
     def set_exit_status(self) -> None:
         failed = 0
@@ -108,7 +114,7 @@ class Queue:
 
     def get_process(self, file_path: str, output_path: str) -> subprocess.Popen:
 
-        cmd_root = ["ffmpeg", "-v", "error", "-nostdin", "-y", "-i", file_path, "-map", "0:v:?"]
+        cmd_root = ["ffmpeg", "-v", "error", "-progress", "pipe:1", "-nostdin", "-y", "-i", file_path, "-map", "0:v:?"]
         cmd_audio_mapping, cmd_subtitles_mapping = ["-map", "0:a:?"], ["-map", "0:s:?"]
         cmd_video_settings = ["-c:v", "libx265", "-preset", self.queue_preset, "-x265-params", "log-level=none"]
         cmd_audio_settings = ["-c:a", "aac", "-b:a", "192k", "-ac", "2"]
@@ -147,7 +153,7 @@ class Queue:
                 cmd_subtitles_mapping = lang_subtitles_mapping
 
         command = cmd_root + cmd_audio_mapping + cmd_subtitles_mapping + cmd_video_settings + cmd_audio_settings + cmd_tail + [output_path]
-        return subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, shell=False, text=True)
+        return subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, text=True)
 
     def run_next(self) -> None:
         current_item = None
@@ -183,6 +189,12 @@ class Queue:
                             proc.send_signal(signal.SIGCONT)
                             current_item["status"] = "RECODING"
                         else:
+
+                            for line in proc.stdout:
+                                if "frame=" in line:
+                                    current_item["progress"] = int(line.split("=")[1].rstrip())
+                                    break
+
                             try:
                                 proc.communicate(timeout=1)
                             except subprocess.TimeoutExpired:
@@ -238,11 +250,12 @@ class Queue:
                         if current_item["name"][-4:] == ".mp4":
                             output_name = current_item["name"][:-4] + ".mkv"
                         else:
-                            current_item = current_item["name"]
-                        os.replace(temp_path, os.path.join(self.output_path, current_item["name"]))
+                            output_name = current_item["name"]
+                        os.replace(temp_path, os.path.join(self.output_path, output_name))
                 else:
                     os.replace(temp_path, current_item["path"])
                 current_item["status"] = "SUCCESS"
+                current_item["progress"] = current_item["frame_count"]
                 self.items_done += 1
 
             elif current_item["status"] != "INTERRUPTED":

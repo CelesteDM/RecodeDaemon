@@ -43,6 +43,9 @@
           pkgs.ffmpeg
 
           pkgs.git
+
+          # nvim deps
+          pkgs.nodejs-slim
         ];
       };
     });

@@ -37,7 +37,7 @@ def print_status(message={}) -> None:
     print("├" + "─"*(width-2) + "┤")
     
     # Body
-    v = ["ID", "STATUS", "ITEMS DONE", "SIZE"]
+    v = ["ID", "STATUS", "PROGRESS", "SIZE"]
     spacing = int((width-2)/len(v))
     diff = width - ((spacing*len(v))+2)
 
@@ -47,9 +47,12 @@ def print_status(message={}) -> None:
     print("├" + "┄"*(width-2) + "┤")
 
     # Per queue values
-    indx, q_amm = 0, len(message["queues"])
+    indx, q_amm = 1, len(message["queues"])
     for queue_id in message["queues"]:
         queue = message["queues"][queue_id]
+
+        if queue["queue_id"] == message["active_queue"] and indx > 1:
+            print("├" + "┈"*(width-2) + "┤")
 
         queue_size = 0
         for item_id in iter(queue["items"]):
@@ -65,13 +68,16 @@ def print_status(message={}) -> None:
 
             for item_id in iter(queue["items"]):
                 item = queue["items"][item_id]
-                v = ["•", item["status"].lower(), item["name"], format_size(item['size'])]
+                item_progress = round(100 / item["frame_count"] * item["progress"])
+                v = ["• " + item["name"], item["status"].lower(), f"{item_progress}%", format_size(item['size'])]
                 if len(v[2]) > spacing:
                     v[2] = v[2][:spacing-1] + "…"
                 print(line.format(*v, s=spacing))
 
-            if q_amm > 1:
+            if q_amm > indx:
                 print("├" + "┈"*(width-2) + "┤")
+
+        indx += 1
 
     print("└" + "─"*(width-2) + "┘")
 
@@ -100,8 +106,6 @@ def status_loop(port):
         print('\033[?25h', end="")
 
 def list_queues(args):
-    width, _ = get_terminal_size()
-
     conn = skt_connect(args["port"])
     if conn:
         answer = skt_communicate(conn, dumps(args))
