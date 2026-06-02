@@ -77,6 +77,7 @@ class Queue:
                     "name": file.name,
                     "size": file.stat().st_size,
                     "error": "",
+                    "exit_code": 0,
                     "frame_count": self.get_frame_count(file.path),
                     "progress": 0,
                         }
@@ -236,7 +237,6 @@ class Queue:
                             self.status = "STOPPING"
                             current_item["status"] = "INTERRUPTED"
                         proc.terminate()
-                        sleep(1)
 
                     case "REMOVING":
                         # Needed for process to terminate
@@ -247,7 +247,6 @@ class Queue:
                             self.status = "REMOVING"
                             current_item["status"] = "INTERRUPTED"
                         proc.terminate()
-                        sleep(1)
 
             self.shared.remove_worker(proc)
 
@@ -277,9 +276,9 @@ class Queue:
 
                 current_item["status"] = "SUCCESS"
                 current_item["progress"] = current_item["frame_count"]
-                self.items_done += 1
+                self.status = "WAITING"
 
-            elif current_item["status"] != "INTERRUPTED":
+            else:
                 try:
                     os.remove(temp_path)
                 except FileNotFoundError:
@@ -287,9 +286,8 @@ class Queue:
                 current_item["status"] = "FAILED"
                 current_item["error"] = proc.communicate()[1]
                 current_item["exit_code"] = proc.returncode
-                self.items_done += 1
 
-            self.status = "WAITING"
+            self.items_done += 1
 
     def snapshot(self) -> dict:
         return {
@@ -325,6 +323,7 @@ class Queue:
                 "name": snapshot["items"][index]["name"],
                 "size": snapshot["items"][index]["size"],
                 "error": snapshot["items"][index]["error"],
+                "exit_code": snapshot["items"][index]["exit_code"],
                 "frame_count": snapshot["items"][index]["frame_count"],
                 "progress": snapshot["items"][index]["progress"],
                 }

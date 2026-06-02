@@ -139,7 +139,7 @@ def list_queues(args):
             print(f"Full path: {item['path']}")
             if item["error"]:
                 print()
-                print(f"Error log: \n{item['error']}")
+                print(f"Error log: (Exit code: {item['exit_code']})\n{item['error']}")
             print()
 
         print("Queue config:")
