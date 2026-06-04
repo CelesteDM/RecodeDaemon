@@ -7,11 +7,13 @@ from json import dumps
 
 TERM_WIDTH = 0
 PREV_ANSWER = {}
+PRINT_LEN = 0
 
 def update_term_size(sig_num=None, stack_frame=None) -> None:
     global TERM_WIDTH
     width, height = get_terminal_size()
     TERM_WIDTH = width
+    system("clear")
     print_status()
 
 def format_size(bytes_: int) -> str:
@@ -22,10 +24,10 @@ def format_size(bytes_: int) -> str:
         bytes_ /= 1000
 
 def print_status(message={}) -> None:
-    global TERM_WIDTH, PREV_ANSWER
+    global TERM_WIDTH, PREV_ANSWER, PRINT_LEN
+    PRINT_LEN = 0
     width = TERM_WIDTH
     message = PREV_ANSWER if not message else message
-    system("clear")
     active_queue = "None" if not message["active_queue"] else message["active_queue"]
     var_len = len(message["status"]) + len(str(active_queue))
 
@@ -35,7 +37,8 @@ def print_status(message={}) -> None:
     print(f"│ Daemon status: {message["status"]}{" "*(width - var_len - 33)}Active queue: {active_queue} │")
     print("│" + " "*(width-2) + "│")
     print("├" + "─"*(width-2) + "┤")
-    
+    PRINT_LEN += 5
+
     # Body
     v = ["ID", "NAME", "STATUS", "PROGRESS", "SIZE"]
     spacing = int((width-6)/(len(v)-1))
@@ -45,6 +48,7 @@ def print_status(message={}) -> None:
 
     print(columns.format(*v, s=spacing))
     print("├" + "┄"*(width-2) + "┤")
+    PRINT_LEN += 2
 
     # Per queue values
     indx, q_amm = 1, len(message["queues"])
@@ -53,6 +57,7 @@ def print_status(message={}) -> None:
 
         if queue["queue_id"] == message["active_queue"] and indx > 1:
             print("├" + "┈"*(width-2) + "┤")
+            PRINT_LEN += 1
 
         queue_size, item_counter = 0, "0/0"
         if queue["status"] != "INIT":
@@ -63,6 +68,7 @@ def print_status(message={}) -> None:
 
         v = [str(queue["queue_id"]), queue["queue_name"], queue["status"].lower(), item_counter, format_size(queue_size)]
         print(columns.format(*v, s=spacing))
+        PRINT_LEN += 1
 
         # Active queue files
         if queue["queue_id"] == message["active_queue"] and queue["status"] != "INIT":
@@ -77,16 +83,19 @@ def print_status(message={}) -> None:
                 if len(v[2]) > spacing:
                     v[2] = v[2][:spacing-1] + "…"
                 print(columns.format(*v, s=spacing))
+                PRINT_LEN += 1
 
             if q_amm > indx:
                 print("├" + "┈"*(width-2) + "┤")
+                PRINT_LEN += 1
 
         indx += 1
 
     print("└" + "─"*(width-2) + "┘")
+    PRINT_LEN += 1
 
 def update_status():
-    global PREV_ANSWER
+    global PREV_ANSWER, PRINT_LEN
     conn = skt_connect(SKT_PORT)
     if conn:
         answer = skt_communicate(conn, '{"cmd": "status"}')
@@ -94,6 +103,7 @@ def update_status():
         answer = {"status": "NOT RUNNING", "active_queue": "", "queues": {}}
     if answer != PREV_ANSWER:
         PREV_ANSWER = answer
+        print(f"\033[{PRINT_LEN}A", end="")
         print_status(answer)
 
 def status_loop(port):
@@ -101,6 +111,7 @@ def status_loop(port):
     SKT_PORT = port
     try:
         print('\033[?25l', end="")
+        system("clear")
         signal.signal(signal.SIGWINCH, update_term_size)
         TERM_WIDTH, _ = get_terminal_size()
         while True:
