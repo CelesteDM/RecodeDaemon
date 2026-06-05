@@ -194,8 +194,10 @@ class Recoder:
 
         history = self.shared.read_history()
         for queue_id in self.queues:
-            if queues[queue_id]["status"] not in ["COMPLETED", "FAILED"]:
+            if queues[queue_id]["status"] not in ["SUCCESS", "FAILED"]:
                 waiting[queue_id] = queues[queue_id]
+            elif queue_id not in history:
+                history[queue_id] = queues[queue_id]
 
         if not all:
             if completed:
@@ -219,7 +221,7 @@ class Recoder:
 
         ids = list(self.shared.read_history())
         for queue_id in self.queues:
-            if self.queues[queue_id].snapshot()["status"] not in ["COMPLETED", "FAILED"]:
+            if self.queues[queue_id].snapshot()["status"] not in ["SUCCESS", "FAILED"]:
                 ids += [queue_id]
 
         queue_id = len(ids)
