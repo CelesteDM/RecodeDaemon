@@ -13,7 +13,7 @@ class Queue:
         self.queue = {}
 
         self.queue_id = queue_id
-        self.queue_name = queue_name if queue_name else self.generate_name(queue_path[0])
+        self.queue_name = self.generate_name(queue_path[0]) if queue_path else queue_name
 
         self.queue_path = queue_path
         self.queue_preset = queue_preset
