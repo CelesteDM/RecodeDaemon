@@ -31,6 +31,8 @@ def print_status(message={}) -> None:
     active_queue = "None" if not message["active_queue"] else message["active_queue"]
     var_len = len(message["status"]) + len(str(active_queue))
 
+    system("clear")
+
     # Header
     print("┌" + "─"*(width-2) + "┐")
     print("│" + " "*(width-2) + "│")

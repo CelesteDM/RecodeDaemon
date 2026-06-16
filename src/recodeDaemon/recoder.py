@@ -213,6 +213,8 @@ class Recoder:
         # Its meant to be run in parallel so the create_queue() function is not stuck without returning the status
         queue.populate()
         self.dump_queues()
+        if self.status == "IDLE":
+            self.set_status("WAITING")
 
     def create_queue(self, path: list, name: str, preset: str, animation: bool, recursive: bool, backup_path: str, output_path: str) -> dict:
         queue_id = ''.join(choice(ascii_lowercase) for _ in range(6))
@@ -316,21 +318,24 @@ class Recoder:
         while True:
             match self.status:
                 case "IDLE":
-                    if self.queues:
-                        self.set_status("WAITING")
-                    else:
-                        sleep(1)
+                    sleep(3)
 
                 case "PAUSED":
                     self.dump_queues()
                     sleep(1)
 
                 case "WAITING":
-                    if not self.queues:
-                        self.set_status("IDLE")
-                    else:
+                    waiting_queues = False
+                    for queue_id in self.queues:
+                        if self.queues[queue_id].snapshot()["status"] == "WAITING":
+                            waiting_queues = True
+                            break
+
+                    if waiting_queues:
                         self.dump_queues()
                         self.run_queues()
+                    else:
+                        self.set_status("IDLE")
 
                 case "STOPPING":
                     while len(threading.enumerate()) != 1 or self.shared.workers_len() != 0:
