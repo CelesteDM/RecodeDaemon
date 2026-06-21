@@ -12,12 +12,12 @@ from random import choice
 from .sharedState import SharedState
 
 class Recoder:
-    queues: dict[int, Queue] = {}
-    status: str = ""
-    active_worker = None
-    active_queue: int
-
     def __init__(self, shared: SharedState, skt_port: int) -> None:
+        self.queues: dict[int, Queue] = {}
+        self.status: str = "INIT"
+        self.active_worker = None
+        self.active_queue: int
+
         self.shared = shared
         self.state_dir = shared.state_dir
         self.queues_path = os.path.join(self.state_dir, "queues")
@@ -38,7 +38,8 @@ class Recoder:
         except OSError:
             sys.stderr.write(f"ERROR: Port address {skt_port} already in use.")
 
-        self.set_status("IDLE")
+        if self.status == "INIT":
+            self.set_status("IDLE")
 
     def init_state_dir(self) -> None:
         if not os.access(self.state_dir, os.F_OK):
@@ -271,6 +272,7 @@ class Recoder:
         if queues:
             self.queues = queues
             self.dump_queues()
+            self.set_status("WAITING")
 
     def run_queues(self) -> None:
         active_queue = ""
@@ -327,7 +329,7 @@ class Recoder:
                 case "WAITING":
                     waiting_queues = False
                     for queue_id in self.queues:
-                        if self.queues[queue_id].snapshot()["status"] == "WAITING":
+                        if self.queues[queue_id].snapshot()["status"] not in ["SUCCESS", "FAILED", "WARNING"]:
                             waiting_queues = True
                             break
 

@@ -1,6 +1,6 @@
 import os, subprocess, signal, psutil
 from time import sleep
-from shutil import copy
+from shutil import copy, move
 from .sharedState import SharedState
 
 class Queue:
@@ -263,12 +263,12 @@ class Queue:
                             output_name = current_item["name"][:-4] + ".mkv"
                         else:
                             output_name = current_item["name"]
-                        os.replace(temp_path, os.path.join(self.output_path, output_name))
+                        move(temp_path, os.path.join(self.output_path, output_name))
 
                 else: # Move the temp path to the original path
-                    os.replace(temp_path, current_item["path"])
+                    move(temp_path, current_item["path"])
                     if current_item["path"][-4:] == ".mp4":
-                        os.replace(current_item["path"], current_item["path"][:-4] + ".mkv")
+                        move(current_item["path"], current_item["path"][:-4] + ".mkv")
 
                 current_item["status"] = "SUCCESS"
                 current_item["progress"] = current_item["frame_count"]
