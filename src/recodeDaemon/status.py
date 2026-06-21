@@ -47,6 +47,7 @@ def print_status(message={}) -> None:
     diff = width - (spacing * (len(v)-1) + 2 + 4) # 2 are the box characters, and 4 the ID column spacing
 
     columns = "│" + "{:^4}" + "{:^{s}.{s}}"*(len(v)-1) + " "*diff + "│"
+    item_columns = "│" + "{:^4}"  + "{:<{s}.{s}}"+ "{:^{s}.{s}}"*(len(v)-2) + " "*diff + "│"
 
     print(columns.format(*v, s=spacing))
     print("├" + "┄"*(width-2) + "┤")
@@ -84,7 +85,7 @@ def print_status(message={}) -> None:
 
                 if len(v[2]) > spacing:
                     v[2] = v[2][:spacing-1] + "…"
-                print(columns.format(*v, s=spacing))
+                print(item_columns.format(*v, s=spacing))
                 PRINT_LEN += 1
 
             if q_amm > indx:
